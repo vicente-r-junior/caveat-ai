@@ -1,0 +1,359 @@
+[RIGHT] <b>Exhibit 10.13</b>
+
+[CENTER] <b>Master Services Agreement</b>
+
+This Master Services Agreement (the “<b>Agreement</b>”), dated as of June 1, 2018 (the “<b>Effective Date</b>”), is by and between <b>Acme Provider Solutions, Inc.</b>, a Delaware corporation, with executive offices located at 100 Market Street, Suite 500th Street, New York, NY 10001 (the “<b>Service Provider</b>”) and <b>Counterparty Holdings</b>, a Delaware corporation, with executive offices located at 200 Bryant Street, Boston, MA 02116 (the “<b>Customer</b>”).
+
+<b>WHEREAS</b>, Customer desires to retain Service Provider to provide certain services described in detail on <b>Exhibit A</b> attached hereto upon the terms and conditions hereinafter set forth, and Service Provider is willing to perform such services.
+
+In consideration of the mutual covenants and agreements hereinafter set forth, the parties agree as follows:
+
+[CENTER] <b>ARTICLE I</b>
+
+[CENTER] <b>DEFINITIONS</b>
+
+“<b>Action</b>” has the meaning set forth in <b>Section 11.01</b>.
+
+“<b>Affiliate</b>” of a Person means any other Person that directly or indirectly, through one or more intermediaries, controls, is controlled by, or is under common control with, such Person. The term “control” (including the terms “controlled by” and “under common control with”) means the possession, directly or indirectly, of the power to direct or cause the direction of the management and policies of a Person, whether through the ownership of voting securities, by contract or otherwise.
+
+“<b>Agreement</b>” has the meaning set forth in the preamble. “<b>Change Order</b>” has the meaning set forth in <b>Section 5.02</b>.
+
+“<b>Confidential Information</b>” means any information that is treated as confidential or proprietary by a party, including, without limitation, trade secrets, technology, information pertaining to business operations and strategies, and information pertaining to customers, pricing, and marketing. Confidential Information shall not include information that: (a) is already known to the Receiving Party without restriction on use or disclosure prior to receipt of such information from the Disclosing Party; (b) is or becomes generally known by the public other than by breach of this Agreement by, or other wrongful act of, the Receiving Party; (c) is developed by the Receiving Party independently of, and without reference to, any Confidential Information of the Disclosing Party; or (d) is received by the Receiving Party from a third party who is not under any obligation to the Disclosing Party to maintain the confidentiality of such information.
+
+“<b>Customer</b>” has the meaning set forth in the preamble.
+
+“<b>Customer Contract Manager</b>” has the meaning set forth in <b>Section 4.01(a)</b>
+
+“<b>Customer Equipment</b>” means any equipment, systems, cabling or facilities provided by Customer and used directly or indirectly in the provision of the Services.
+
+“<b>Customer Materials</b>” means any documents, data, know-how, methodologies, software and other materials provided to Service Provider by Customer, including computer programs, reports and specifications.
+
+“<b>Deliverables</b>” means all documents, work product and other materials that are delivered to Customer hereunder or prepared by or on behalf of Service Provider in the course of performing the Services, including any items identified as such on <b>Exhibit A</b>.
+
+“<b>Disclosing Party</b>” means a party that discloses Confidential Information under this Agreement.
+
+“<b>Force Majeure Event</b>” has the meaning set forth in <b>Section 15.01</b>.
+
+“<b>Intellectual Property Rights</b>” means all (a) patents, patent disclosures and inventions (whether patentable or not), (b) trademarks, service marks, trade dress, trade names, logos, corporate names and domain names, together with all of the goodwill associated therewith, (c) copyrights and copyrightable works (including computer programs), and rights in data and databases, (d) trade secrets, know-how and other confidential information, and (e) all other intellectual property rights, in each case whether registered or unregistered and including all applications for, and renewals or extensions of, such rights, and all similar or equivalent rights or forms of protection in any part of the world.
+
+“<b>Law</b>” means any statute, law, ordinance, regulation, rule, code, order, constitution, treaty, common law, judgment, decree, other requirement or rule of law of any federal, state, local or foreign government or political subdivision thereof, or any arbitrator, court or tribunal of competent jurisdiction.
+
+“<b>Losses</b>” mean all losses, damages, liabilities, deficiencies, actions, judgments, interest, awards, penalties, fines, costs or expenses of whatever kind that are actually incurred, including reasonable attorneys’ fees and the cost of enforcing any right to indemnification hereunder and the cost of pursuing any insurance providers.
+
+“<b>Permitted Subcontractor</b>” has the meaning set forth in <b>Section 3.01(h)</b>.
+
+“<b>Person</b>” means an individual, corporation, partnership, joint venture, Limited Liability Company, governmental authority, unincorporated organization, trust, association or other entity.
+
+“<b>Project</b>” means the project as described on <b>Exhibit A</b>.
+
+“<b>Project Milestone</b>” means an event or task described on <b>Exhibit A</b> which shall be completed by the relevant date set forth on <b>Exhibit A</b>.
+
+“<b>Receiving Party</b>” means a party that receives or acquires Confidential Information directly or indirectly under this Agreement.
+
+“<b>Service Provider</b>” has the meaning set forth in the preamble.
+
+“<b>Service Provider Contract Manager</b>” has the meaning set forth in <b>Section 3.01(a)(i)</b>.
+
+“<b>Service Provider Equipment</b>” means any equipment, systems, cabling or facilities provided by or on behalf of Service Provider and used directly or indirectly in the provision of the Services.
+
+“<b>Service Provider Personnel</b>” means all employees and Permitted Subcontractors, if any, engaged by Service Provider to perform the Services.
+
+“<b>Services</b>” mean any professional or other services to be provided by Service Provider under this Agreement, as described in more detail on <b>Exhibit A</b>, and Service Provider’s obligations under this Agreement.
+
+“<b>Term</b>” has the meaning set forth in <b>Article VI</b>.
+
+[CENTER] <b>ARTICLE II</b>
+
+[CENTER] <b>SERVICES</b>
+
+<b>Section 2.01</b> Service Provider has developed a proprietary electronic platform (the “<b>Service Provider Ad Engine</b>”) that is used for the delivery of programmatic advertising, including all improvements thereon which are not specifically customized and paid for by Customer pursuant to work performed by Service Provider under this Master Services Agreement. Service Provider shall make an image copy of the currently existing Service Provider Ad Engine (the “<b>Customer Image</b>”) and place the image onto Amazon Web Services (“<b>AWS</b>”). Service Provider shall maintain the Customer Image on AWS as further described in <b>Exhibit A</b>. Service Provider shall update the Customer Image with new releases and modifications of the Service Provider Ad Engine; <i>provided</i>, that modifications requested by Customer to the Customer Image do not impair Service Provider’s ability to update the Service Provider Ad Engine. Service Provider shall provide Customer access and copies of the source code and/or object code to all custom revisions to the Customer Image as performed by Service Provider pursuant to Section 2.02 hereof; <i>provided, however</i>, Service Provider shall not provide any source code to Customer which is included in the Service Provider Ad Engine.
+
+<b>Section 2.02</b> If applicable, Service Provider shall provide the Services to Customer, which will be detailed as part of a contractual exhibit. The Services may include, but will not be limited to, the scope of design and technical specifications to be developed, the date the Services will commence and be completed, the Project implementation plan, Project Milestones, and any fees to be paid to Service Provider.
+
+[CENTER] <b>ARTICLE III</b>
+
+[CENTER] <b>SERVICE PROVIDER’S OBLIGATIONS </b>
+
+<b>Section 3.01 </b>The Service Provider shall:
+
+(a) subject to the prior written approval of Customer, not to be unreasonably withheld or delayed, appoint:
+
+(i) a Service Provider employee to serve as a primary contact with respect to this Agreement and who will have the authority to act on behalf of Service Provider in connection with matters pertaining to this Agreement (the “<b>Service Provider Contract Manager</b>”); and
+
+(ii) Service Provider Personnel, who shall be suitably skilled, experienced and qualified to perform the Services;
+
+(b) maintain the same Service Provider Contract Manager throughout the Term of this Agreement except for changes in such personnel due to:
+
+(i) Customer’s request pursuant to <b>Section 3.01(c)</b>; or
+
+(ii) the resignation or termination of such personnel or other circumstances outside of Service Provider’s reasonable control;
+
+(c) upon the reasonable written request of Customer, promptly replace the Service Provider Contract Manager and any other Service Provider Personnel;
+
+(d) before the date on which the Services are to start, obtain, and at all times during the Term of this Agreement maintain, all necessary licenses and consents and comply with all relevant Laws applicable to the provision of the Services;
+
+(e) prior to any Service Provider Personnel performing any Services hereunder: (i) ensure that such Service Provider Personnel have the legal right to work in the United States; and (ii) at its sole cost and expense, conduct background checks on such Service Provider Personnel, which background checks shall comprise, at a minimum, a review of credit history, references and criminal record, in accordance with state, federal and local law;
+
+(f) comply with in all material respects, and ensure that all Service Provider Personnel comply with in all material respects, all rules, regulations and policies of Customer that are communicated to Service Provider in writing, including security procedures concerning systems and data and remote access thereto, building security procedures, including the restriction of access by Customer to certain areas of its systems for security reasons, and general health and safety practices and procedures;
+
+(g) maintain complete and accurate records relating to the provision of the Services under this Agreement, including records of the time spent and materials used by Service Provider in providing the Services in such form as Customer shall approve. During the Term, upon Customer’s written request, Service Provider shall allow Customer or Customer’s representative to inspect and make copies of such records and interview Service Provider Personnel in connection with the provision of the Services; <i>provided that</i> any such inspection shall take place during regular business hours no more than once per year and Customer provides Service Provider with at least ten (10) business days advance written notice;
+
+(h) obtain Customer’s written approval, which consent shall not be unreasonably withheld or delayed, prior to entering into agreements with or otherwise engaging any Person, including all subcontractors and Affiliates of Service Provider, other than Service Provider’s employees to provide any Services and Deliverables to Customer (each such approved subcontractor or other third party, a “<b>Permitted Subcontractor</b>”). Customer’s approval shall not relieve Service Provider of its obligations under the Agreement, and Service Provider shall remain fully responsible for the performance of each such Permitted Subcontractor and its employees and for their compliance with all of the terms and conditions of this Agreement as if they were Service Provider’s own employees. Nothing contained in this Agreement shall create any contractual relationship between Customer and any Service Provider subcontractor or supplier; and
+
+(i) require each Permitted Subcontractor to be bound in writing by the confidentiality and intellectual property assignment or license provisions of this Agreement.
+
+<b>Section 3.02</b> Service Provider is responsible for all Service Provider Personnel and for the payment of their compensation, including, if applicable, withholding of income taxes, and the payment and withholding of social security and other payroll taxes, unemployment insurance, workers’ compensation insurance payments and disability benefits.
+
+[CENTER] <b>ARTICLE IV</b>
+
+[CENTER] <b>CUSTOMER’S OBLIGATIONS</b>
+
+<b>Section 4.01 </b>Customer shall:
+
+(a) cooperate with Service Provider in all matters relating to the Services and appoint a Customer employee to serve as the primary contact with respect to this Agreement and who will have the authority to act on behalf of Customer with respect to matters pertaining to this Agreement (the “<b>Customer Contract Manager</b>”);
+
+(b) provide, subject to <b>Section 3.01(f)</b>, such access to Customer’s premises, and such office accommodation and other facilities as may reasonably be requested by Service Provider, for the purposes of performing the Services;
+
+(c) respond promptly to any Service Provider request to provide direction, information, approvals, authorizations or decisions that are reasonably necessary for Service Provider to perform Services in accordance with the requirements of this Agreement;
+
+(d) provide such information as Service Provider may request, in order to carry out the Services, in a timely manner, and ensure that it is complete and accurate in all material respects; and
+
+(e) obtain and maintain all necessary licenses and consents and comply with all applicable Law in relation to the Services, the installation of the Service Provider Equipment, the use of Client Materials and the use of the Customer Equipment in relation to the Service Provider Equipment, in all cases before the date on which the Services are to start.
+
+<b>Section 4.02</b> If Service Provider’s performance of its obligations under this Agreement is prevented or delayed by any act or omission of Customer or its agents, subcontractors, consultants or employees, Service Provider shall not be deemed in breach of its obligations under this Agreement or otherwise liable for any costs, charges or losses sustained or incurred by Customer, in each case, to the extent arising directly or indirectly from such prevention or delay.
+
+[CENTER] <b>ARTICLE V</b>
+
+[CENTER] <b>CHANGE ORDERS</b>
+
+<b>Section 5.01</b> If either party wishes to change the scope or performance of the Services, it shall submit details of the requested change to the other in writing. Service Provider shall, within a reasonable time after such request (and, if such request is initiated by Customer, not more than ten (10) business days after receipt of Customer’s written request), provide a written estimate to Customer of:
+
+(a) the likely time required to implement the change;
+
+(b) any necessary variations to the fees and other charges for the Services arising from the change;
+
+(c) the likely effect of the change on the Services; and
+
+(d) any other impact the change might have on the performance of this Agreement.
+
+<b>Section 5.02</b> Promptly after receipt of the written estimate, the parties shall negotiate and agree in writing on the terms of such change (a “<b>Change Order</b>”). Neither party shall be bound by any Change Order unless mutually agreed upon in writing in accordance with <b>Section 16.10</b>.
+
+[CENTER] <b>ARTICLE VI</b>
+
+[CENTER] <b>TERM</b>
+
+<b>Section 6.01</b> This Agreement shall commence as of the Effective Date and shall continue thereafter for a period of six (6) months (the “<b>Term</b>”), unless sooner terminated pursuant to <b>Article XIII</b>. The Term of this Agreement shall automatically renew for additional periods of six (6) months each upon the expiration of the initial or any succeeding Term unless terminated by either party. Either party hereto may terminate this Agreement with or without cause by providing the non-terminating party with two (2) days prior written notice (email is acceptable).
+
+[CENTER] <b>ARTICLE VII</b>
+
+[CENTER] <b>FEES AND EXPENSES; PAYMENT TERMS</b>
+
+<b>Section 7.01</b> All startup costs relates to the Services shall be waived by Service Provider.
+
+<b>Section 7.02</b> In consideration of the provision of the Services by the Service Provider and the rights granted to Customer under this Agreement, Customer shall pay the fees set forth in a License Agreement between the parties dated June 1, 2018. Payment to Service Provider of such fees pursuant to this <b>Article VII</b> shall constitute payment in full for the performance of the Services, and, Customer shall not be responsible for paying any other fees, costs or expenses.
+
+<b>Section 7.03</b> Service Provider shall issue invoices to Customer only in accordance with the terms of this Section and the License Agreement.
+
+<b>Section 7.04</b> Customer shall not be responsible for any taxes imposed on, or with respect to, Service Provider’s income, revenues, gross receipts, personnel or real or personal property or other assets.
+
+<b>Section 7.05</b> Service Provider reserves the right to suspend all Services in the event that Customer fails to pay each invoice within 15 days of receipt.
+
+[CENTER] <b>ARTICLE VIII</b>
+
+[CENTER] <b>INTELLECTUAL PROPERTY RIGHTS; OWNERSHIP</b>
+
+<b>Section 8.01</b> Customer is, and shall be, the sole and exclusive owner of all right, title and interest in and to the Deliverables, including all Intellectual Property Rights therein. Service Provider agrees, and will cause its Service Provider Personnel to agree, that with respect to any Deliverables that may qualify as “work made for hire” as defined in 17 U.S.C. § 101, such Deliverables are hereby deemed a “work made for hire” for Customer. To the extent that any of the Deliverables do not constitute a “work made for hire”, Service Provider hereby irrevocably assigns, and shall cause the Service Provider Personnel to irrevocably assign to Customer, in each case without additional consideration, all right, title and interest throughout the world in and to the Deliverables, including all Intellectual Property Rights therein. The Service Provider shall cause the Service Provider Personnel to irrevocably waive, to the extent permitted by applicable Law, any and all claims such Service Provider Personnel may now or hereafter have in any jurisdiction to so-called “moral rights” or rights of droit moral with respect to the Deliverables.
+
+<b>Section 8.02</b> Notwithstanding the foregoing, Customer acknowledges and agrees that the Service Provider Ad Engine contains and will contain valuable trade secrets and/or proprietary and confidential information of Service Provider, and, any right, title and interest to the Service Provider Ad Engine shall remain with Service Provider, including any patents, copyrights, trademarks, trade secrets, methods of processing, design, documentation and structure of individual programs and their interaction and programming techniques employed therein. Nothing in this Agreement shall be construed to vest in Customer any ownership interest set forth in Section 8.01 above in the Service Provider Ad Engine to Customer.
+
+<b>Section 8.03</b> Upon the reasonable request of Customer, Service Provider shall, and shall cause the Service Provider Personnel to, promptly take such further actions, including execution and delivery of all appropriate instruments of conveyance, as may be necessary to assist Customer to prosecute, register, perfect or record its rights in or to any Deliverables.
+
+<b>Section 8.04</b> Customer and its licensors are, and shall remain, the sole and exclusive owner of all right, title and interest in and to the Customer Materials, including all Intellectual Property Rights therein. Service Provider shall have no right or license to use any Customer Materials except solely during the Term of the Agreement to the extent necessary to provide the Services to Customer. All other rights in and to the Client Materials are expressly reserved by Customer.
+
+[CENTER] <b>ARTICLE IX</b>
+
+[CENTER] <b>CONFIDENTIAL INFORMATION</b>
+
+<b> </b>
+
+<b>Section 9.01 </b>The Receiving Party agrees:
+
+(a) not to disclose or otherwise make available Confidential Information of the Disclosing Party to any third party without the prior written consent of the Disclosing Party; <i>provided, however</i>, that the Receiving Party may disclose the Confidential Information of the Disclosing Party to its Affiliates, and their officers, employees, consultants and legal advisors who have a “need to know”, who have been apprised of this restriction and who are themselves bound by nondisclosure obligations at least as restrictive as those set forth in this <b>Article IX</b>;
+
+(b) to use the Confidential Information of the Disclosing Party only for the purposes of performing its obligations under the Agreement or, in the case of Customer, to make use of the Services and Deliverables; and
+
+(c) to promptly notify the Disclosing Party in the event it becomes aware of any loss or disclosure of any of the Confidential Information of Disclosing Party.
+
+<b>Section 9.02</b> If the Receiving Party becomes legally compelled to disclose any Confidential Information, the Receiving Party shall provide:
+
+(a) prompt written notice of such requirement so that the Disclosing Party may seek, at its sole cost and expense, a protective order or other remedy; and
+
+(b) reasonable assistance, at the Disclosing Party’s sole cost and expense, in opposing such disclosure or seeking a protective order or other limitations on disclosure.
+
+If, after providing such notice and assistance as required herein, the Receiving Party remains required by Law to disclose any Confidential Information, the Receiving Party shall disclose no more than that portion of the Confidential Information which, on the advice of the Receiving Party’s legal counsel, the Receiving Party is legally required to disclose and, upon the Disclosing Party’s request, shall use commercially reasonable efforts to obtain assurances from the applicable court or agency that such Confidential Information will be afforded confidential treatment.
+
+[CENTER] <b>ARTICLE X</b>
+
+[CENTER] <b>REPRESENTATIONS AND WARRANTIES</b>
+
+<b>Section 10.01 </b>Each party represents and warrants to the other party that:
+
+(a) it is duly organized, validly existing and in good standing as a corporation or other entity as represented herein under the laws and regulations of its jurisdiction of incorporation, organization or chartering;
+
+(b) it has the full right, power and authority to enter into this Agreement, to grant the rights and licenses granted hereunder and to perform its obligations hereunder;
+
+(c) the execution of this Agreement by its representative whose signature is set forth at the end hereof has been duly authorized by all necessary corporate action of the party; and
+
+(d) when executed and delivered by such party, this Agreement will constitute the legal, valid and binding obligation of such party, enforceable against such party in accordance with its terms.
+
+<b>Section 10.02</b> Service Provider represents and warrants to Customer that:
+
+(a) it shall perform the Services using personnel of required skill, experience and qualifications and in a professional and workmanlike manner in accordance with commercially reasonable industry standards for similar services and shall devote adequate resources to meet its obligations under this Agreement;
+
+(b) it and the Service Provider Personnel are in compliance with, and shall perform the Services in compliance with, all applicable Laws;
+
+(c) (i) none of the Services, Deliverables and Customer’s use thereof infringe or will infringe any Intellectual Property Right of any third party and, (ii) as of the date hereof, there are no pending or, to Service Provider’s knowledge, threatened claims, litigation or other proceedings pending against Service Provider by any third party based on an alleged violation of such Intellectual Property Rights, in each case, excluding any infringement or claim, litigation or other proceedings to the extent arising out of (x) any Customer Materials or any instruction, information, designs, specifications or other materials provided by Customer to Service Provider, (y) use of the Deliverables in combination with any materials or equipment not supplied or specified by Service Provider, if the infringement would have been avoided by the use of the Deliverables not so combined, and (z) any modifications or changes made to the Deliverables by or on behalf of any Person other than Service Provider. Service Provider’s sole liability and Customer’s sole and exclusive remedy for Service Provider’s breach of this <b>Section 10.02(c)</b> are Service Provider’s obligations under <b>Section 11.02</b>;
+
+(d) the Services and Deliverables will be and shall remain in conformity in all material respects with all requirements or specifications stated in this Agreement; and
+
+(e) the Services, Deliverables, Project, Service Provider Equipment, Service Provider Ad Engine, and Customer Image do not and will not infringe any patent, trademark, trade secret, copyright or other intellectual or proprietary right of any third party or constitute, assist or encourage a criminal offense, or otherwise create liability or violate any Law at any time.
+
+<b>Section 10.03</b> EXCEPT FOR THE EXPRESS WARRANTIES IN THIS AGREEMENT, EACH PARTY HEREBY DISCLAIMS ALL WARRANTIES, EITHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE UNDER THIS AGREEMENT, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+[CENTER] <b>ARTICLE XI</b>
+
+[CENTER] <b>INDEMNIFICATION</b>
+
+<b>Section 11.01</b> Service Provider shall defend, indemnify and hold harmless Customer and its officers, directors, employees, agents, successors and permitted assigns (each, a “<b>Customer Indemnity</b>”) from and against all Losses arising out of or resulting from any third party claim, suit, action or proceeding (each, an “<b>Action</b>”) arising out of or resulting from:
+
+(a) bodily injury, death of any person or damage to real or tangible, personal property resulting from the willful, fraudulent or grossly negligent acts or omissions of Service Provider or Service Provider Personnel performed under this Agreement; and
+
+(b) Service Provider’s material breach of any representation, warranty or obligation of Service Provider set forth in this Agreement.
+
+<b>Section 11.02</b> Service Provider shall defend, indemnify and hold harmless the Customer Indemnities from and against all Losses based on a claim that any of the Services, Deliverables, Service Provider Ad Engine or Customer Image infringes any Intellectual Property Right of a third party arising under the Laws of the United States; <i>provided, however</i>, that Service Provider shall have no obligations under this <b>Section 11.02</b> with respect to claims to the extent arising out of any Customer Materials or any instruction, information, designs, specifications or other materials provided by Customer in writing to Service Provider.
+
+<b>Section 11.03</b> Customer shall defend, indemnify and hold harmless Service Provider and its officers, directors, employees, agents, successors and permitted assigns (“<b>Service Provider Indemnitiees</b>”) from and against all Losses awarded against Service Provider in a final judgment arising out of or resulting from any third party Action arising out of or resulting from:
+
+(a) bodily injury, death of any person or damage to real or tangible, personal property resulting from the grossly negligent or willful acts or omissions of Customer; and
+
+(b) Customer’s material breach of any representation, warranty or obligation of Customer set forth in this Agreement.
+
+<b>Section 11.04</b> Customer shall defend, indemnify and hold harmless the Service Provider Indemnities from and against all Losses awarded against a Service Provider Indemnity in a final judgment based on a claim that any of the Customer Materials infringes any Intellectual Property Right of a third party arising under the Laws of the United States.
+
+<b>Section 11.05</b> The party seeking indemnification hereunder shall promptly notify the indemnifying party in writing of any Action and cooperate with the indemnifying party at the indemnifying party’s sole cost and expense. The indemnifying party shall immediately take control of the defense and investigation of such Action and shall employ counsel of its choice to handle and defend the same, at the indemnifying party’s sole cost and expense. The indemnifying party shall not settle any Action in a manner that adversely affects the rights of the
+
+[CENTER] 10
+
+indemnified party without the indemnified party’s prior written consent. The indemnified party’s failure to perform any obligations under this <b>Section 11.05</b> shall not relieve the indemnifying party of its obligations under this <b>Section 11.05</b> except to the extent that the indemnifying party can demonstrate that it has been materially prejudiced as a result of such failure. The indemnified party may participate in and observe the proceedings at its own cost and expense.
+
+[CENTER] <b>ARTICLE XII</b>
+
+[CENTER] <b>LIMITATION OF LIABILITY</b>
+
+<b>Section 12.01</b> IN NO EVENT WILL EITHER PARTY BE LIABLE TO THE OTHER OR TO ANY THIRD PARTY FOR ANY LOSS OF USE, REVENUE OR PROFIT OR LOSS OF DATA OR FOR ANY CONSEQUENTIAL, INCIDENTAL, INDIRECT, EXEMPLARY, SPECIAL OR PUNITIVE DAMAGES WHETHER ARISING OUT OF BREACH OF CONTRACT, TORT (INCLUDING NEGLIGENCE) OR OTHERWISE, REGARDLESS OF WHETHER SUCH DAMAGE WAS FORESEEABLE AND WHETHER OR NOT SUCH PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+<b>Section 12.02</b> EXCEPT WITH RESPECT TO A PARTY’S INDEMNIFICATION OBLIGATIONS, IN NO EVENT WILL EITHER PARTY’S LIABILITY ARISING OUT OF OR RELATED TO THIS AGREEMENT, WHETHER ARISING OUT OF OR RELATED TO BREACH OF CONTRACT, TORT (INCLUDING NEGLIGENCE) OR OTHERWISE, EXCEED THE AGGREGATE AMOUNTS PAID OR PAYABLE TO SERVICE PROVIDER PURSUANT TO THIS AGREEMENT.
+
+[CENTER] <b>ARTICLE XIII</b>
+
+[CENTER] <b>TERMINATION; EFFECT OF TERMINATION</b>
+
+<b>Section 13.01</b> Either party hereto may terminate this Agreement with or without cause by providing the non-terminating party with two (2) days prior written notice (email is acceptable).
+
+<b>Section 13.02</b> Upon expiration or termination of this Agreement for any reason:
+
+(a) Service Provider shall, (i) promptly deliver to Customer all Deliverables (whether complete or incomplete) for which Customer has paid, all Customer Equipment and all Customer Materials, (ii) promptly remove any Service Provider Equipment located at Customer’s premises, (iii) provide reasonable cooperation and assistance to Customer upon Customer’s written request and at Customer’s expense in transitioning the Services to an alternate Service Provider, and (iv) on a pro rata basis, repay all fees and expenses paid in advance for any Services or Deliverables which have not been provided.
+
+(b) Each party shall (i) except as otherwise provided herein, return to the other party all documents and tangible materials (and any copies) containing, reflecting, incorporating or based on the other party’s Confidential Information, (ii) except as otherwise provided herein or as may be necessary to show compliance with Laws or the terms of this Agreement, permanently erase all of the other party’s Confidential Information from its computer systems,
+
+[CENTER] 11
+
+and (iii) certify in writing to the other party that it has complied with the requirements of this clause.
+
+(c) In no event shall Customer be liable for any Service Provider Personnel termination costs arising from the expiration or termination of this Agreement.
+
+<b>Section 13.03</b> The rights and obligations of the parties set forth in this <b>Section</b> and <b>Article I</b>, <b>Article II</b>, <b>Article VII</b>, <b>Article VIII</b>, <b>Article IX</b>, <b>Article XI</b>, <b>Article XII</b>, <b>Section 13.03</b>, <b>Article XVI</b>, and any right or obligation of the parties in this Agreement which, by its nature, should survive termination or expiration of this Agreement, will survive any such termination or expiration of this Agreement.
+
+[CENTER] <b>ARTICLE XIV</b>
+
+[CENTER] <b>NON-EXCLUSIVITY</b>
+
+The Service Provider retains the right to perform the same or similar type of services for third parties during the Term of this Agreement.
+
+[CENTER] <b>ARTICLE XV</b>
+
+[CENTER] <b>FORCE MAJEURE</b>
+
+<b>Section 15.01</b> No party shall be liable or responsible to the other party, nor be deemed to have defaulted under or breached this Agreement, for any failure or delay in fulfilling or performing any term of this Agreement (except for any obligations to make payments to the other party hereunder), when and to the extent such failure or delay is caused by or results from acts beyond the affected party’s reasonable control, including, without limitation:
+
+(a) acts of God;
+
+(b) flood, fire or explosion;
+
+(c) war, invasion, riot or other civil unrest;
+
+(d) actions, embargoes or blockades in effect on or after the date of this Agreement;
+
+(e) national or regional emergency;
+
+(f) strikes, labor stoppages or slowdowns or other industrial disturbances;
+
+(g) compliance with any law or governmental order, rule, regulation or direction, or any action taken by a governmental or public authority, including but not limited to imposing an embargo, export or import restriction, quota or other restriction or prohibition, or failing to grant a necessary license or consent;
+
+(h) shortage of adequate power or telecommunications or transportation facilities; or
+
+[CENTER] 12
+
+(i) any other event which is beyond the reasonable control of such party.
+
+(each of the foregoing, a “<b>Force Majeure Event</b>”). A party whose performance is affected by a Force Majeure Event shall give notice to the other party, stating the period of time the occurrence is expected to continue and shall use diligent efforts to end the failure or delay and minimize the effects of such Force Majeure Event.
+
+<b>Section 15.02</b> The non-affected party may terminate this Agreement and, if the non- affected party is Customer, receive a refund of any amounts paid to the Service Provider in advance for the affected Services.
+
+[CENTER] <b>ARTICLE XVI</b>
+
+[CENTER] <b>MISCELLANEOUS</b>
+
+<b>Section 16.01</b> Each party shall, upon the reasonable request of the other party, execute such documents and perform such acts as may be necessary to give full effect to the terms of this Agreement.
+
+<b>Section 16.02 </b>The relationship between the parties is that of independent contractors. Nothing contained in this Agreement shall be construed as creating any agency, partnership, joint venture or other form of joint enterprise, employment or fiduciary relationship between the parties, and neither party shall have authority to contract for or bind the other party in any manner whatsoever.
+
+<b>Section 16.03</b> Neither party shall issue or release any announcement, statement, press release or other publicity or marketing materials relating to this Agreement, or otherwise use the other party’s trademarks, service marks, trade names, logos, symbols or brand names, in each case, without the prior written consent of the other party.
+
+<b>Section 16.04</b> All notices, requests, consents, claims, demands, waivers and other communications hereunder shall be in writing and shall be deemed to have been given (a) when delivered by hand (with written confirmation of receipt); (b) when received by the addressee if sent by a nationally recognized overnight courier (receipt requested); (c) on the date sent by facsimile or email (with confirmation of transmission) if sent during normal business hours of the recipient, and on the next business day if sent after normal business hours of the recipient; or (d) on the third day after the date mailed, by certified or registered mail, return receipt requested, postage prepaid. Such communications must be sent to the respective parties at the addresses indicated in the opening paragraph of this Agreement.
+
+[CENTER] 13
+
+<b>Section 16.05</b> For purposes of this Agreement, (a) the words “include,” “includes” and “including” shall be deemed to be followed by the words “without limitation”; (b) the word “or” is not exclusive; and (c) the words “herein,” “hereof,” “hereby,” “hereto” and “hereunder” refer to this Agreement as a whole. Unless the context otherwise requires, references herein: (x) to Sections and Exhibits refer to the Sections of and Exhibits attached to this Agreement; (y) to an agreement, instrument or other document means such agreement, instrument or other document as amended, supplemented and modified from time to time to the extent permitted by the provisions thereof, and (z) to a statute means such statute as amended from time to time and includes any successor legislation thereto and any regulations promulgated thereunder. This Agreement shall be construed without regard to any presumption or rule requiring construction or interpretation against the party drafting an instrument or causing any instrument to be drafted. The Exhibits referred to herein shall be construed with, and as an integral part of, this Agreement to the same extent as if they were set forth verbatim herein.
+
+<b>Section 16.06</b> This Agreement, together with all Exhibits and any other documents incorporated herein by reference, constitutes the sole and entire agreement of the parties to this Agreement with respect to the subject matter contained herein, and supersedes all prior and contemporaneous understandings and agreements, both written and oral, with respect to such subject matter. In the event of any conflict between the terms and provisions of this Agreement and those of any Exhibit, the following order of precedence shall govern: (a) first, this Agreement, exclusive of its Exhibits; and (b) second, any Exhibits to this Agreement.
+
+<b>Section 16.07</b> Neither party may assign, transfer or delegate any or all of its rights or obligations under this Agreement, without the prior written consent of the other party; <i>provided, that</i>, upon prior written notice to the other party, either party may assign the Agreement to an Affiliate of such party or to a successor of all or substantially all of the assets of such party through merger, reorganization, consolidation or acquisition. No assignment shall relieve the assigning party of any of its obligations hereunder. Any attempted assignment, transfer or other conveyance in violation of the foregoing shall be null and void. This Agreement shall be binding upon and shall inure to the benefit of the parties hereto and their respective successors and permitted assigns.
+
+<b>Section 16.08</b> This Agreement is for the sole benefit of the parties hereto and their respective successors and permitted assigns and nothing herein, express or implied, is intended to or shall confer upon any other Person any legal or equitable right, benefit or remedy of any nature whatsoever, under or by reason of this Agreement.
+
+<b>Section 16.09</b> The headings in this Agreement are for reference only and shall not affect the interpretation of this Agreement.
+
+<b>Section 16.10</b> This Agreement may only be amended, modified or supplemented by an agreement in writing signed by each party hereto. No waiver by any party of any of the provisions hereof shall be effective unless explicitly set forth in writing and signed by the party so waiving. Except as otherwise set forth in this Agreement, no failure to exercise, or delay in exercising, any rights, remedy, power or privilege arising from this Agreement shall operate or be construed as a waiver thereof; nor shall any single or partial exercise of any right, remedy,
+
+[CENTER] 14
+
+power or privilege hereunder preclude any other or further exercise thereof or the exercise of any other right, remedy, power or privilege.
+
+<b>Section 16.11</b> If any term or provision of this Agreement is invalid, illegal or unenforceable in any jurisdiction, such invalidity, illegality or unenforceability shall not affect any other term or provision of this Agreement or invalidate or render unenforceable such term or provision in any other jurisdiction. Upon such determination that any term or other provision is invalid, illegal or unenforceable, the parties hereto shall negotiate in good faith to modify this Agreement so as to effect the original intent of the parties as closely as possible in a mutually acceptable manner in order that the transactions contemplated hereby be consummated as originally contemplated to the greatest extent possible.
+
+<b>Section 16.12</b> This Agreement shall be governed by and construed in accordance with the internal laws of the State of New York without giving effect to any choice or conflict of law provision or rule (whether of the State of New York or any other jurisdiction) that would cause the application of Laws of any jurisdiction other than those of the State of New York. Any legal suit, action or proceeding arising out of or related to this Agreement or the Services provided hereunder shall be instituted exclusively in the federal courts of the United States or the courts of the State of New York, and each party irrevocably submits to the exclusive jurisdiction of such courts in any such suit, action or proceeding.
+
+<b>Section 16.13</b> EACH PARTY IRREVOCABLY AND UNCONDITIONALLY WAIVES ANY RIGHT IT MAY HAVE TO A TRIAL BY JURY IN RESPECT OF ANY LEGAL ACTION ARISING OUT OF OR RELATING TO THIS AGREEMENT OR THE TRANSACTIONS CONTEMPLATED HEREBY.
+
+<b>Section 16.14</b> Each party acknowledges that a breach by a party of <b>Article VIII</b> (Intellectual Property Rights; Ownership) or <b>Article IX</b> (Confidentiality) may cause the non- breaching party irreparable damages, for which an award of damages would not be adequate compensation and agrees that, in the event of such breach or threatened breach, the non- breaching party will be entitled to seek equitable relief, including a restraining order, injunctive relief, specific performance and any other relief that may be available from any court, in addition to any other remedy to which the non-breaching party may be entitled at law or in equity. Such remedies shall not be deemed to be exclusive but shall be in addition to all other remedies available at law or in equity, subject to any express exclusions or limitations in this Agreement to the contrary.
+
+<b>Section 16.15</b> This Agreement may be executed in counterparts, each of which shall be deemed an original, but all of which together shall be deemed to be one and the same agreement. A signed copy of this Agreement delivered by facsimile, email or other means of electronic transmission shall be deemed to have the same legal effect as delivery of an original signed copy of this Agreement.
+
+[CENTER] [SIGNATURE PAGE FOLLOWS]
+
+[CENTER] 15
+
+IN WITNESS WHEREOF, the parties hereto have executed this Agreement as of the date first above written.
+
+[CENTER] 16

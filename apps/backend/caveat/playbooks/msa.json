@@ -1,0 +1,76 @@
+{
+  "contract_type": "MSA",
+  "description": "Master Services Agreement — US transactional norms",
+  "sections": {
+    "liability_cap": {
+      "expected": true,
+      "severity_if_missing": "high",
+      "description": "Aggregate liability cap should generally be at least 12 months of fees paid in the trailing period. Sub-12-month caps are aggressive in favor of Provider.",
+      "red_flags": [
+        "liability cap of 3 months or less",
+        "liability cap excluding direct damages",
+        "no mutual cap"
+      ]
+    },
+    "indemnification": {
+      "expected": true,
+      "severity_if_missing": "high",
+      "description": "Mutual indemnification, with carve-outs for IP infringement and breach of confidentiality. One-way indemnification favoring Provider only is heavily Provider-friendly.",
+      "red_flags": [
+        "one-way indemnification",
+        "indemnification with no carve-outs",
+        "indemnification capped below liability cap"
+      ]
+    },
+    "termination": {
+      "expected": true,
+      "severity_if_missing": "medium",
+      "description": "Both parties should have termination rights. Termination for convenience by Provider without refund of prepaid fees is unusual. 30-day notice period is standard.",
+      "red_flags": [
+        "termination for convenience without refund clause",
+        "Provider-only termination rights",
+        "notice period under 15 days for convenience termination"
+      ]
+    },
+    "ip_ownership": {
+      "expected": true,
+      "severity_if_missing": "medium",
+      "description": "Work product ownership should be clearly assigned to Customer (work-for-hire or assignment). Provider retains pre-existing IP and general tools/methodologies.",
+      "red_flags": [
+        "Provider retains all work product",
+        "no carve-out for Provider pre-existing IP",
+        "ambiguous IP ownership language"
+      ]
+    },
+    "confidentiality": {
+      "expected": true,
+      "severity_if_missing": "medium",
+      "description": "Tight definition of Confidential Information (marked or known to be confidential). Survival period 3-5 years post-termination is standard; perpetual for trade secrets.",
+      "red_flags": [
+        "overly broad confidentiality definition (e.g., 'all information shared')",
+        "no survival period stated",
+        "survival period under 2 years"
+      ]
+    },
+    "governing_law": {
+      "expected": true,
+      "severity_if_missing": "low",
+      "description": "Should specify a US state. Delaware, New York, and California are common neutral choices. Avoid offshore or non-US jurisdictions for US-based parties.",
+      "red_flags": [
+        "non-US governing law for US parties",
+        "no governing law clause",
+        "governing law in Provider home state without negotiation"
+      ]
+    },
+    "dpa": {
+      "expected": true,
+      "severity_if_missing": "missing",
+      "description": "Data Protection Addendum (DPA) required if Provider processes Customer personal data. Reference must exist in main agreement; DPA itself can be an exhibit.",
+      "red_flags": [
+        "no DPA reference despite data processing",
+        "DPA reference but no executed DPA attached",
+        "DPA terms inconsistent with main agreement"
+      ]
+    }
+  }
+}

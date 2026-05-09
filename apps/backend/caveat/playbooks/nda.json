@@ -1,0 +1,66 @@
+{
+  "contract_type": "NDA",
+  "description": "Non-Disclosure Agreement — US transactional norms",
+  "sections": {
+    "confidential_information_scope": {
+      "expected": true,
+      "severity_if_missing": "high",
+      "description": "Confidential Information should be tightly defined: information marked confidential, or known by a reasonable person to be confidential given the context of disclosure. Overly broad definitions (e.g., 'any information disclosed by either party') swallow ordinary business communications and become unenforceable in practice.",
+      "red_flags": [
+        "definition reads 'any information disclosed by either party'",
+        "no requirement that information be marked or identified as confidential",
+        "definition includes information already known to the receiving party"
+      ]
+    },
+    "term_and_survival": {
+      "expected": true,
+      "severity_if_missing": "medium",
+      "description": "The NDA must specify (a) the term of the agreement itself and (b) the survival period for confidentiality obligations after termination. US norm is 3-5 years post-termination for general confidential information; perpetual survival for trade secrets is standard and acceptable.",
+      "red_flags": [
+        "no survival period stated",
+        "survival period under 2 years for general confidential information",
+        "perpetual survival applied to all information rather than trade secrets only"
+      ]
+    },
+    "return_or_destruction": {
+      "expected": true,
+      "severity_if_missing": "medium",
+      "description": "Upon termination or written request, the receiving party must return or certify destruction of all Confidential Information, including copies. A carve-out for archival/backup copies subject to continued confidentiality is common.",
+      "red_flags": [
+        "no return-or-destruction obligation",
+        "destruction permitted without written certification",
+        "no carve-out for legally required record retention"
+      ]
+    },
+    "mutuality": {
+      "expected": true,
+      "severity_if_missing": "low",
+      "description": "Mutual NDAs (both parties may be Discloser and Receiver) are standard for arms-length business discussions. One-way NDAs heavily favor the Discloser and are appropriate only when the information flow is genuinely one-directional.",
+      "red_flags": [
+        "one-way NDA in a context that calls for mutuality",
+        "asymmetric remedies favoring only one party"
+      ]
+    },
+    "exceptions": {
+      "expected": true,
+      "severity_if_missing": "medium",
+      "description": "Standard carve-outs from confidential treatment: information that (a) was already known to the receiving party; (b) is or becomes publicly available through no fault of the receiving party; (c) is independently developed without use of Confidential Information; (d) is disclosed pursuant to legal process. Missing exceptions make the NDA punitive.",
+      "red_flags": [
+        "no independent-development carve-out",
+        "no public-domain carve-out",
+        "no required-by-law carve-out",
+        "no already-known carve-out"
+      ]
+    },
+    "governing_law": {
+      "expected": true,
+      "severity_if_missing": "low",
+      "description": "Should specify a US state. Delaware, New York, and California are common neutral choices. Avoid offshore or non-US jurisdictions for US-based parties.",
+      "red_flags": [
+        "non-US governing law for US parties",
+        "no governing law clause",
+        "governing law in counterparty's home state without negotiation"
+      ]
+    }
+  }
+}

@@ -60,7 +60,7 @@ check-backend:
     # intercept — `uv run python -m <tool>` runs the venv's Python, which
     # imports the tool from the venv's site-packages directly.
     cd {{backend}} && uv run python -m ruff check caveat tests
-    cd {{backend}} && uv run python -m mypy caveat
+    cd {{backend}} && uv run python -m mypy caveat tests
     cd {{backend}} && uv run python -m pytest tests/unit -q
 
 check-frontend:
@@ -69,13 +69,15 @@ check-frontend:
     cd {{frontend}} && pnpm test
 
 # ----------------------------------------------------------------------
-# E2E — Playwright tests (frontend) + httpx tests (backend)
+# E2E — Playwright tests (frontend) + pytest+httpx tests (backend)
 # Requires `just install` to have run first.
+# Backend E2E uses fastapi.testclient; LLM is mocked at the
+# ollama_client boundary. Real Gemma is exercised only by the
+# manual validation scenarios in sprints/sprint-N-validation.md.
 # ----------------------------------------------------------------------
 test-e2e:
+    cd {{backend}} && uv run python -m pytest tests/e2e -q
     cd {{frontend}} && pnpm test:e2e
-    # Backend e2e (pytest+httpx) lands in Sprint 1; left as a no-op here
-    # so the target exists and Sprint 1 can append without renaming.
 
 # ----------------------------------------------------------------------
 # Sprint verification — runs install + check + test-e2e end to end.
@@ -88,6 +90,15 @@ verify-sprint-0:
     @echo ""
     @echo "Sprint 0 verification passed."
     @echo "Now walk through the manual scenarios in sprints/sprint-0-validation.md."
+
+verify-sprint-1:
+    just install
+    just check
+    just test-e2e
+    @echo ""
+    @echo "Sprint 1 verification: PASS"
+    @echo "Now walk through the manual scenarios in sprints/sprint-1-validation.md."
+    @echo "(The real-Ollama scenario requires `ollama serve` running with gemma4:e4b pulled.)"
 
 # ----------------------------------------------------------------------
 # Demo — load seed data for the contest demo (Sprint 6).

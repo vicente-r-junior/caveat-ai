@@ -1,0 +1,4 @@
+{
+  "feature_directory": "specs/001-caveat-ai",
+  "note": "Caveat AI works on main per CLAUDE.md (sprints commit directly to main). This pin lets speckit scripts skip branch-name validation."
+}
