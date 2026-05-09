@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design-token CSS custom properties mirrored from /design-tokens.md.
+ * The React tree consumes these via Tailwind classes (tailwind.config.js
+ * mirrors the same hex values); these vars exist so the prototype HTML
+ * in /docs/ — which references the variables directly — can also be
+ * inspected without remapping.
+ */
+:root {
+  --bg: #ffffff;
+  --bg-soft: #fafaf9;
+  --bg-tint: #f5f3ee;
+
+  --ink: #18181b;
+  --ink-soft: #3f3f46;
+  --ink-muted: #71717a;
+
+  --line: #e4e4e7;
+  --line-soft: #f4f4f5;
+
+  --burgundy: #7a1f2b;
+  --burgundy-soft: #faf2f3;
+
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --warn: #c2410c;
+  --warn-soft: #fff7ed;
+  --safe: #15803d;
+  --safe-soft: #f0fdf4;
+  --gold: #a16207;
+
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'Geist', -apple-system, sans-serif;
+  --mono: 'Geist Mono', monospace;
+}
+
+@layer base {
+  body {
+    font-family: theme('fontFamily.sans');
+    background-color: theme('colors.bg');
+    color: theme('colors.ink');
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}

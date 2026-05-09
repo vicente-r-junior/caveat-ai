@@ -1,0 +1,1991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caveat AI — Full Flow Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #fafaf9;
+    --bg-tint: #f5f3ee;
+    --ink: #18181b;
+    --ink-soft: #3f3f46;
+    --ink-muted: #71717a;
+    --line: #e4e4e7;
+    --line-soft: #f4f4f5;
+    --burgundy: #7a1f2b;
+    --burgundy-soft: #faf2f3;
+    --danger: #b91c1c;
+    --danger-soft: #fef2f2;
+    --warn: #c2410c;
+    --warn-soft: #fff7ed;
+    --safe: #15803d;
+    --safe-soft: #f0fdf4;
+    --gold: #a16207;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Geist', -apple-system, sans-serif;
+    --mono: 'Geist Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  /* ============== PROTOTYPE NAVIGATOR ============== */
+  .proto-nav {
+    background: var(--ink);
+    color: white;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 200;
+  }
+
+  .proto-nav-label {
+    color: rgba(255,255,255,0.5);
+    flex-shrink: 0;
+  }
+
+  .proto-nav-btn {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.7);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .proto-nav-btn:hover {
+    border-color: rgba(255,255,255,0.4);
+    color: white;
+  }
+
+  .proto-nav-btn.active {
+    background: white;
+    color: var(--ink);
+    border-color: white;
+  }
+
+  .proto-nav-btn .num {
+    color: var(--burgundy);
+    font-weight: 700;
+  }
+
+  .proto-nav-btn.active .num {
+    color: var(--burgundy);
+  }
+
+  .proto-nav-flow {
+    color: rgba(255,255,255,0.3);
+    margin: 0 4px;
+  }
+
+  .proto-nav-spacer { flex: 1; }
+
+  .proto-nav-meta {
+    color: rgba(255,255,255,0.4);
+    flex-shrink: 0;
+  }
+
+  /* ============== SCREEN CONTAINER ============== */
+  .screen { display: none; min-height: calc(100vh - 38px); }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ============== TOPBAR (shared) ============== */
+  .topbar {
+    height: 56px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 24px;
+    flex-shrink: 0;
+  }
+
+  .brand { display: flex; align-items: baseline; gap: 8px; }
+  .brand-mark { font-family: var(--serif); font-size: 20px; font-weight: 600; letter-spacing: -0.01em; font-style: italic; }
+  .brand-tag { font-family: var(--mono); font-size: 9px; color: var(--burgundy); text-transform: uppercase; letter-spacing: 0.18em; border: 1px solid var(--burgundy); padding: 2px 6px; border-radius: 3px; font-weight: 500; }
+  .topbar-divider { width: 1px; height: 24px; background: var(--line); }
+  .topbar-doc { font-size: 14px; color: var(--ink-soft); font-weight: 500; }
+  .topbar-doc em { font-style: normal; color: var(--ink-muted); }
+  .topbar-status { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+  .status-pill { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 4px; }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--safe); }
+  .status-pill.working .dot { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .btn { font-family: var(--sans); font-size: 13px; font-weight: 500; padding: 8px 14px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; border-radius: 6px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: var(--bg-soft); border-color: var(--ink-muted); }
+  .btn.primary { background: var(--ink); color: white; border-color: var(--ink); }
+  .btn.primary:hover { background: var(--ink-soft); border-color: var(--ink-soft); }
+  .btn.burgundy { background: var(--burgundy); color: white; border-color: var(--burgundy); }
+  .btn.burgundy:hover { background: #5d1822; border-color: #5d1822; }
+
+  /* ============== SCREEN 01: EMPTY / UPLOAD ============== */
+  .upload-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px 80px;
+    background: var(--bg);
+  }
+
+  .upload-wrap {
+    max-width: 1100px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 64px;
+    align-items: center;
+  }
+
+  .upload-left {
+    padding-right: 20px;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--burgundy);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .hero-eyebrow::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: var(--burgundy);
+  }
+
+  .hero-title {
+    font-family: var(--serif);
+    font-size: 64px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+  }
+
+  .hero-title em {
+    font-style: italic;
+    color: var(--burgundy);
+    font-weight: 400;
+  }
+
+  .hero-lead {
+    font-size: 17px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+    margin-bottom: 32px;
+    max-width: 480px;
+  }
+
+  .hero-lead strong { font-weight: 600; color: var(--ink); }
+
+  .hero-stats {
+    display: flex;
+    gap: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-muted);
+  }
+
+  .hero-stats b {
+    color: var(--ink);
+    font-weight: 600;
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 16px;
+    display: block;
+    margin-bottom: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .upload-right {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 28px;
+    box-shadow: 0 20px 50px -30px rgba(0,0,0,0.15);
+  }
+
+  .upload-right-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-muted);
+    margin-bottom: 16px;
+  }
+
+  .upload-zone {
+    border: 1.5px dashed var(--line);
+    border-radius: 6px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-soft);
+  }
+
+  .upload-zone:hover {
+    border-color: var(--burgundy);
+    background: var(--burgundy-soft);
+  }
+
+  .upload-glyph {
+    font-family: var(--serif);
+    font-size: 56px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--burgundy);
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  .upload-text {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+
+  .upload-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  .upload-recent {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .upload-recent-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+  }
+
+  .recent-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line-soft);
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .recent-item:last-child { border-bottom: none; }
+  .recent-item:hover .recent-name { color: var(--burgundy); }
+
+  .recent-name {
+    color: var(--ink);
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+
+  .recent-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-muted);
+  }
+
+  /* ============== SCREEN 02: UPLOADING ============== */
+  .uploading-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+    background: var(--bg);
+  }
+
+  .uploading-wrap {
+    max-width: 640px;
+    width: 100%;
+  }
+
+  .uploading-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--burgundy);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 14px;
+  }
+
+  .uploading-title {
+    font-family: var(--serif);
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin-bottom: 32px;
+  }
+
+  .uploading-title em { font-style: italic; color: var(--burgundy); font-weight: 400; }
+
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+
+  .file-row {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 18px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .file-row.complete {
+    border-color: var(--safe);
+    background: var(--safe-soft);
+  }
+
+  .file-icon {
+    width: 28px;
+    height: 32px;
+    background: var(--bg-tint);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  .file-row.complete .file-icon {
+    background: white;
+    border-color: var(--safe);
+    color: var(--safe);
+  }
+
+  .file-info { min-width: 0; }
+
+  .file-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .file-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-muted);
+    display: flex;
+    gap: 8px;
+  }
+
+  .file-status {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-muted);
+  }
+
+  .file-row.complete .file-status {
+    color: var(--safe);
+    font-weight: 600;
+  }
+
+  .file-progress {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+    height: 3px;
+    background: var(--line-soft);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .file-progress-bar {
+    height: 100%;
+    background: var(--burgundy);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .file-row.complete .file-progress { display: none; }
+
+  .uploading-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+
+  .uploading-info {
+    font-size: 13px;
+    color: var(--ink-muted);
+  }
+
+  .uploading-info strong { color: var(--ink); font-weight: 600; }
+
+  /* ============== SCREEN 03: PROCESSING ============== */
+  .processing-screen {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+    background: var(--bg);
+  }
+
+  .processing-wrap {
+    max-width: 640px;
+    width: 100%;
+  }
+
+  .processing-doc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    margin-bottom: 32px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+
+  .processing-doc-pill .name {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .processing-doc-pill .meta {
+    color: var(--ink-muted);
+    border-left: 1px solid var(--line);
+    padding-left: 12px;
+  }
+
+  .processing-title {
+    font-family: var(--serif);
+    font-size: 44px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    margin-bottom: 12px;
+  }
+
+  .processing-title em { font-style: italic; color: var(--burgundy); font-weight: 400; }
+
+  .processing-sub {
+    font-size: 16px;
+    color: var(--ink-soft);
+    margin-bottom: 36px;
+  }
+
+  .pipeline {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 28px;
+  }
+
+  .pipe-step {
+    display: grid;
+    grid-template-columns: 32px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 14px 16px;
+    font-size: 14px;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  .pipe-step.done { color: var(--ink-muted); }
+  .pipe-step.active {
+    background: var(--bg-soft);
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .pipe-step.pending { color: var(--ink-muted); opacity: 0.5; }
+
+  .pipe-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-muted);
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .pipe-step.done .pipe-num { color: var(--safe); }
+  .pipe-step.done .pipe-num::before { content: "✓"; }
+  .pipe-step.done .pipe-num span { display: none; }
+
+  .pipe-step.active .pipe-num { color: var(--burgundy); font-weight: 700; }
+
+  .pipe-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .pipe-step.active .pipe-time {
+    color: var(--burgundy);
+    font-weight: 600;
+  }
+
+  .pipe-step.active .pipe-time::after {
+    content: "●";
+    margin-left: 6px;
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  .processing-note {
+    padding: 14px 16px;
+    background: var(--burgundy-soft);
+    border-left: 3px solid var(--burgundy);
+    border-radius: 0 4px 4px 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .processing-note strong { color: var(--burgundy); font-weight: 600; }
+
+  /* ============== SCREEN 04: REVIEW (the main app) ============== */
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    background: var(--bg-soft);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-section { padding: 16px; }
+
+  .sidebar-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-muted);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sidebar-label .count { color: var(--burgundy); font-weight: 600; }
+
+  .doc-item {
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .doc-item:hover { background: white; border-color: var(--line); }
+  .doc-item.active { background: white; border-color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+
+  .doc-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+
+  .doc-icon {
+    width: 22px;
+    height: 26px;
+    background: var(--bg-tint);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+  }
+
+  .doc-item.active .doc-icon { background: var(--burgundy-soft); border-color: var(--burgundy); color: var(--burgundy); }
+
+  .doc-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.3;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .doc-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-muted);
+    margin-left: 30px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .doc-meta .risk-high { color: var(--danger); font-weight: 600; }
+  .doc-meta .risk-med { color: var(--warn); font-weight: 600; }
+
+  .add-btn {
+    width: 100%;
+    padding: 12px;
+    border: 1.5px dashed var(--line);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--ink-muted);
+    font-family: var(--sans);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 8px;
+  }
+
+  .add-btn:hover { border-color: var(--burgundy); color: var(--burgundy); background: var(--burgundy-soft); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 16px;
+    border-top: 1px solid var(--line);
+    background: white;
+  }
+
+  .privacy-note {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--ink-muted);
+    line-height: 1.6;
+  }
+
+  .privacy-note strong {
+    color: var(--burgundy);
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .tabs {
+    display: flex;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+    padding: 0 24px;
+    gap: 4px;
+    align-items: end;
+    height: 48px;
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 0 16px;
+    height: 48px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+  }
+
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--ink); border-bottom-color: var(--burgundy); }
+
+  .tab .badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    background: var(--bg-tint);
+    color: var(--ink-soft);
+    border-radius: 3px;
+  }
+
+  .tab.active .badge { background: var(--burgundy); color: white; }
+  .tab .badge.danger { background: var(--danger); color: white; }
+
+  .tab-spacer { flex: 1; }
+  .tab-actions { display: flex; gap: 8px; padding-bottom: 8px; }
+
+  .content { flex: 1; overflow-y: auto; background: var(--bg); }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  .findings-wrap { max-width: 880px; margin: 0 auto; padding: 32px 32px 80px; }
+  .pane-header { margin-bottom: 32px; }
+  .pane-eyebrow { font-family: var(--mono); font-size: 10px; color: var(--burgundy); text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 10px; }
+  .pane-title { font-family: var(--serif); font-size: 36px; font-weight: 600; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 8px; }
+  .pane-title em { font-style: italic; color: var(--burgundy); font-weight: 400; }
+  .pane-lead { font-size: 15px; color: var(--ink-soft); max-width: 600px; line-height: 1.55; }
+
+  .findings-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 32px;
+  }
+
+  .summary-cell { background: var(--bg); padding: 16px 18px; }
+  .summary-cell .label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-muted); margin-bottom: 6px; }
+  .summary-cell .value { font-family: var(--serif); font-size: 28px; font-weight: 600; line-height: 1; }
+  .summary-cell.danger .value { color: var(--danger); }
+  .summary-cell.warn .value { color: var(--warn); }
+
+  .filter-row { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; }
+  .filter-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-muted); margin-right: 4px; }
+  .filter-chip { font-family: var(--sans); font-size: 12px; padding: 5px 12px; border-radius: 16px; background: var(--bg-soft); border: 1px solid var(--line); cursor: pointer; color: var(--ink-soft); font-weight: 500; }
+  .filter-chip.active { background: var(--ink); color: white; border-color: var(--ink); }
+
+  .finding {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+
+  .finding:hover { border-color: var(--ink-muted); }
+
+  .finding-head {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .severity { font-family: var(--mono); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; padding: 4px 8px; border-radius: 3px; flex-shrink: 0; }
+  .severity.high { background: var(--danger); color: white; }
+  .severity.med { background: var(--warn); color: white; }
+  .severity.low { background: var(--gold); color: white; }
+  .severity.missing { background: var(--ink); color: white; }
+
+  .finding-title { font-family: var(--serif); font-size: 18px; font-weight: 600; flex: 1; line-height: 1.3; }
+  .finding-ref { font-family: var(--mono); font-size: 11px; color: var(--ink-muted); }
+
+  .finding-body { padding: 20px; }
+
+  .finding-quote {
+    border-left: 3px solid var(--burgundy);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: var(--burgundy-soft);
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    border-radius: 0 4px 4px 0;
+  }
+
+  .finding-explain { font-size: 14px; line-height: 1.6; color: var(--ink-soft); margin-bottom: 16px; }
+  .finding-explain strong { color: var(--ink); font-weight: 600; }
+
+  .finding-redline { background: var(--bg-soft); padding: 14px 16px; border-radius: 6px; border: 1px solid var(--line); }
+  .redline-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--burgundy); font-weight: 600; margin-bottom: 8px; }
+  .redline-text { font-family: var(--serif); font-size: 14px; line-height: 1.55; color: var(--ink); }
+  .redline-text del { text-decoration: line-through; color: var(--danger); background: var(--danger-soft); padding: 0 3px; border-radius: 2px; }
+  .redline-text ins { text-decoration: none; background: var(--safe-soft); color: var(--safe); padding: 0 3px; border-radius: 2px; font-weight: 500; }
+
+  .finding-actions { display: flex; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+  .mini-btn { font-family: var(--sans); font-size: 12px; font-weight: 500; padding: 6px 12px; border: 1px solid var(--line); background: var(--bg); cursor: pointer; color: var(--ink-soft); border-radius: 5px; transition: all 0.15s; }
+  .mini-btn:hover { background: var(--bg-soft); }
+  .mini-btn.accept:hover { color: var(--safe); border-color: var(--safe); background: var(--safe-soft); }
+  .mini-btn.reject:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+
+  .summary-wrap { max-width: 720px; margin: 0 auto; padding: 32px 32px 80px; }
+  .client-doc { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  .client-doc-head { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .client-doc-head .firm { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--ink-muted); margin-bottom: 8px; }
+  .client-doc-head .title { font-family: var(--serif); font-size: 26px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; }
+  .client-doc h3 { font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--ink); margin: 24px 0 10px; letter-spacing: -0.01em; }
+  .client-doc p { font-size: 15px; line-height: 1.65; color: var(--ink-soft); margin-bottom: 12px; }
+  .client-doc ul { list-style: none; margin: 0 0 12px; padding: 0; }
+  .client-doc li { font-size: 15px; line-height: 1.6; color: var(--ink-soft); padding: 8px 0 8px 24px; position: relative; }
+  .client-doc li::before { content: "→"; position: absolute; left: 0; top: 8px; color: var(--burgundy); font-weight: 600; }
+  .client-doc li strong { color: var(--ink); font-weight: 600; }
+
+  .verdict { margin-top: 28px; padding: 20px; background: var(--warn-soft); border-left: 4px solid var(--warn); border-radius: 4px; }
+  .verdict-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--warn); font-weight: 700; margin-bottom: 6px; }
+  .verdict-text { font-family: var(--serif); font-size: 17px; font-weight: 600; line-height: 1.4; color: var(--ink); font-style: italic; }
+  .disclaimer { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-muted); line-height: 1.6; font-style: italic; }
+
+  .source-wrap { max-width: 800px; margin: 0 auto; padding: 32px 32px 80px; }
+  .source-doc { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 40px 48px; font-family: var(--serif); }
+  .source-section { margin-bottom: 28px; }
+  .source-section-num { font-family: var(--mono); font-size: 10px; color: var(--burgundy); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 6px; font-weight: 600; }
+  .source-section-title { font-family: var(--serif); font-weight: 600; font-size: 16px; margin-bottom: 10px; color: var(--ink); }
+  .source-text { font-size: 14px; line-height: 1.7; color: var(--ink-soft); text-align: justify; hyphens: auto; }
+  .source-text mark { background: var(--warn-soft); border-bottom: 2px solid var(--warn); padding: 1px 2px; color: var(--ink); border-radius: 2px; }
+  .source-text mark.danger { background: var(--danger-soft); border-bottom-color: var(--danger); }
+
+  .chat-wrap { max-width: 760px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; padding: 0 24px; }
+  .chat-header { padding: 24px 8px 20px; border-bottom: 1px solid var(--line); }
+  .chat-eyebrow { font-family: var(--mono); font-size: 10px; color: var(--burgundy); text-transform: uppercase; letter-spacing: 0.18em; margin-bottom: 8px; }
+  .chat-title { font-family: var(--serif); font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 6px; }
+  .chat-title em { font-style: italic; color: var(--burgundy); font-weight: 400; }
+  .chat-sub { font-size: 13px; color: var(--ink-muted); }
+  .chat-context { margin-top: 14px; padding: 10px 12px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--ink-soft); }
+  .chat-context strong { color: var(--ink); font-weight: 600; }
+
+  .chat-messages { flex: 1; overflow-y: auto; padding: 20px 8px; display: flex; flex-direction: column; gap: 20px; }
+  .msg { display: flex; flex-direction: column; gap: 6px; max-width: 90%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.bot { align-self: flex-start; align-items: flex-start; }
+  .msg-author { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; padding: 0 4px; }
+  .msg.user .msg-author { color: var(--ink-soft); }
+  .msg.bot .msg-author { color: var(--burgundy); font-weight: 600; }
+  .msg-bubble { padding: 14px 18px; border-radius: 14px; font-size: 14px; line-height: 1.55; }
+  .msg.user .msg-bubble { background: var(--ink); color: white; border-bottom-right-radius: 4px; }
+  .msg.bot .msg-bubble { background: var(--bg-soft); color: var(--ink); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .msg-bubble strong { font-weight: 600; }
+  .msg-bubble em { font-style: italic; color: var(--burgundy); }
+  .msg-citation { margin-top: 10px; padding: 8px 12px; background: white; border-left: 2px solid var(--burgundy); border-radius: 0 4px 4px 0; font-family: var(--serif); font-style: italic; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+  .msg-citation .src { display: block; font-family: var(--mono); font-style: normal; font-size: 9px; color: var(--burgundy); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; font-weight: 600; }
+  .msg-table { margin-top: 10px; border-collapse: collapse; width: 100%; font-size: 12.5px; background: white; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .msg-table th, .msg-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line-soft); }
+  .msg-table th { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); background: var(--bg-soft); font-weight: 600; }
+  .msg-table td { color: var(--ink-soft); }
+  .msg-table td.num { font-family: var(--mono); font-weight: 600; color: var(--ink); }
+  .msg-table tr:last-child td { border-bottom: none; }
+
+  .chat-composer { padding: 16px 8px 24px; border-top: 1px solid var(--line); background: var(--bg); }
+  .composer-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); transition: border-color 0.15s; margin-top: 14px; }
+  .composer-wrap:focus-within { border-color: var(--burgundy); }
+  .composer-input { width: 100%; border: none; outline: none; padding: 14px 16px 4px; font-family: var(--sans); font-size: 14px; color: var(--ink); background: transparent; resize: none; min-height: 44px; }
+  .composer-input::placeholder { color: var(--ink-muted); }
+  .composer-bar { display: flex; align-items: center; padding: 8px 12px 10px; gap: 6px; }
+  .composer-chip { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; padding: 4px 9px; border-radius: 4px; background: var(--bg-soft); border: 1px solid var(--line); color: var(--ink-muted); cursor: pointer; font-weight: 500; }
+  .composer-chip:hover { color: var(--ink); border-color: var(--ink-muted); }
+  .composer-send { margin-left: auto; background: var(--ink); color: white; border: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: grid; place-items: center; font-size: 14px; }
+
+  .suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 0; }
+  .suggestion { font-family: var(--sans); font-size: 12.5px; padding: 7px 12px; background: white; border: 1px solid var(--line); border-radius: 16px; cursor: pointer; color: var(--ink-soft); }
+  .suggestion:hover { background: var(--burgundy-soft); border-color: var(--burgundy); color: var(--burgundy); }
+  .suggestion .icon { color: var(--burgundy); margin-right: 6px; font-weight: 600; }
+
+  /* ============== SCREEN 05: EXPORT ============== */
+  .export-screen {
+    flex: 1;
+    background: var(--bg-soft);
+    padding: 48px 32px;
+    overflow-y: auto;
+  }
+
+  .export-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 48px;
+  }
+
+  .export-config {
+    padding-top: 8px;
+  }
+
+  .export-eyebrow {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--burgundy);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .export-eyebrow::before {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: var(--burgundy);
+  }
+
+  .export-title {
+    font-family: var(--serif);
+    font-size: 40px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 14px;
+  }
+
+  .export-title em { font-style: italic; color: var(--burgundy); font-weight: 400; }
+
+  .export-sub {
+    font-size: 15px;
+    color: var(--ink-soft);
+    line-height: 1.55;
+    margin-bottom: 32px;
+  }
+
+  .format-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+
+  .format-item {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    padding: 16px 18px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .format-item:hover { border-color: var(--ink-muted); }
+
+  .format-item.selected {
+    border-color: var(--burgundy);
+    background: var(--burgundy-soft);
+  }
+
+  .format-glyph {
+    font-family: var(--serif);
+    font-size: 26px;
+    font-weight: 600;
+    font-style: italic;
+    color: var(--burgundy);
+    width: 40px;
+    text-align: center;
+    line-height: 1;
+  }
+
+  .format-info { flex: 1; }
+  .format-info .name { font-weight: 600; font-size: 14px; color: var(--ink); }
+  .format-info .desc { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+  .format-check {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--line);
+    border-radius: 50%;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .format-item.selected .format-check {
+    border-color: var(--burgundy);
+    background: var(--burgundy);
+  }
+
+  .format-item.selected .format-check::after {
+    content: "✓";
+    color: white;
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .send-options {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    padding: 18px;
+    border-radius: 8px;
+  }
+
+  .send-options-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-muted);
+    margin-bottom: 12px;
+  }
+
+  .send-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .send-input {
+    flex: 1;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    border-radius: 6px;
+  }
+
+  .doc-preview {
+    background: white;
+    border: 1px solid var(--line);
+    box-shadow: 0 20px 60px -30px rgba(0,0,0,0.25);
+    padding: 48px 56px;
+    min-height: 720px;
+    position: relative;
+    border-radius: 4px;
+  }
+
+  .doc-preview::before {
+    content: "PREVIEW";
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    font-family: var(--mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--ink-muted);
+    background: var(--bg-soft);
+    padding: 4px 8px;
+    border-radius: 3px;
+  }
+
+  .doc-letterhead {
+    text-align: center;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 18px;
+    margin-bottom: 22px;
+  }
+
+  .doc-letterhead .firm-name { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: 0.05em; }
+  .doc-letterhead .firm-meta { font-family: var(--mono); font-size: 9px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.18em; margin-top: 6px; }
+
+  .doc-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; font-size: 12px; }
+  .doc-meta-item .label { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--ink-muted); margin-bottom: 2px; }
+  .doc-meta-item .val { font-weight: 600; color: var(--ink); }
+
+  .doc-h1 { font-family: var(--serif); text-align: center; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 22px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+
+  .doc-h2 { font-family: var(--serif); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--burgundy); margin: 22px 0 10px; }
+
+  .doc-p { font-family: var(--serif); font-size: 12.5px; line-height: 1.65; margin-bottom: 10px; color: var(--ink-soft); text-align: justify; }
+  .doc-p strong { color: var(--ink); font-weight: 600; }
+
+  .doc-quote {
+    margin: 12px 0;
+    padding: 8px 16px;
+    border-left: 3px solid var(--burgundy);
+    background: var(--burgundy-soft);
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--ink-soft);
+  }
+
+  .doc-sig { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line); font-family: var(--serif); font-size: 12px; line-height: 1.5; }
+  .doc-sig .name { font-weight: 700; color: var(--ink); }
+  .doc-sig .reg { color: var(--ink-muted); font-family: var(--mono); font-size: 10px; }
+
+  @media (max-width: 1100px) {
+    .upload-wrap, .export-wrap { grid-template-columns: 1fr; gap: 32px; }
+    .hero-title { font-size: 44px; }
+  }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .findings-summary { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============== PROTOTYPE NAVIGATOR ============== -->
+<nav class="proto-nav">
+  <span class="proto-nav-label">Flow:</span>
+  <button class="proto-nav-btn active" data-screen="empty"><span class="num">01</span> Empty</button>
+  <span class="proto-nav-flow">→</span>
+  <button class="proto-nav-btn" data-screen="uploading"><span class="num">02</span> Uploading</button>
+  <span class="proto-nav-flow">→</span>
+  <button class="proto-nav-btn" data-screen="processing"><span class="num">03</span> Processing</button>
+  <span class="proto-nav-flow">→</span>
+  <button class="proto-nav-btn" data-screen="review"><span class="num">04</span> Review</button>
+  <span class="proto-nav-flow">→</span>
+  <button class="proto-nav-btn" data-screen="export"><span class="num">05</span> Export</button>
+  <div class="proto-nav-spacer"></div>
+  <span class="proto-nav-meta">Caveat AI · prototype · v3</span>
+</nav>
+
+<!-- ============================================ -->
+<!-- SCREEN 01: EMPTY / UPLOAD                    -->
+<!-- ============================================ -->
+<section class="screen active" data-screen="empty">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Caveat</span>
+      <span class="brand-tag">AI</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-doc"><em>No documents loaded</em></div>
+    <div class="topbar-status">
+      <div class="status-pill"><span class="dot"></span>Local · Gemma 4 31B</div>
+      <div class="status-pill"><span class="dot"></span>0 network requests</div>
+    </div>
+  </header>
+
+  <div class="upload-screen">
+    <div class="upload-wrap">
+
+      <div class="upload-left">
+        <div class="hero-eyebrow">A new instrument · for old standards</div>
+        <h1 class="hero-title">Read the contract.<br><em>Keep the secret.</em></h1>
+        <p class="hero-lead">
+          Drop a contract. Get a risk analysis, a redline pack, and a plain-English summary you can send to your client &mdash; all generated <strong>on this machine</strong>, by a model that runs locally and never sees the network.
+        </p>
+        <div class="hero-stats">
+          <div><b>0</b>requests sent</div>
+          <div><b>~45s</b>avg. analysis</div>
+          <div><b>128K</b>context window</div>
+        </div>
+      </div>
+
+      <div class="upload-right">
+        <div class="upload-right-label">Begin a review</div>
+        <div class="upload-zone">
+          <div class="upload-glyph">↓</div>
+          <div class="upload-text">Drop PDFs here</div>
+          <div class="upload-sub">or click · up to 5 documents</div>
+        </div>
+        <div class="upload-recent">
+          <div class="upload-recent-label">Recent reviews</div>
+          <div class="recent-item">
+            <span class="recent-name">Acme MSA — counterparty draft v3</span>
+            <span class="recent-meta">2h ago</span>
+          </div>
+          <div class="recent-item">
+            <span class="recent-name">NDA — TechCorp / acquirer</span>
+            <span class="recent-meta">yesterday</span>
+          </div>
+          <div class="recent-item">
+            <span class="recent-name">Employment agreement — J. Carter</span>
+            <span class="recent-meta">3d ago</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SCREEN 02: UPLOADING                         -->
+<!-- ============================================ -->
+<section class="screen" data-screen="uploading">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Caveat</span>
+      <span class="brand-tag">AI</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-doc">Uploading 5 documents <em>· receiving files</em></div>
+    <div class="topbar-status">
+      <div class="status-pill working"><span class="dot"></span>Reading files</div>
+      <div class="status-pill"><span class="dot"></span>0 network requests</div>
+    </div>
+  </header>
+
+  <div class="uploading-screen">
+    <div class="uploading-wrap">
+
+      <div class="uploading-eyebrow">Step 02 · receiving</div>
+      <h2 class="uploading-title">Five files <em>arriving safely.</em></h2>
+
+      <div class="file-list">
+
+        <div class="file-row complete">
+          <div class="file-icon">PDF</div>
+          <div class="file-info">
+            <div class="file-name">acme-msa-v3.pdf</div>
+            <div class="file-meta"><span>28 pages</span><span>·</span><span>1.2 MB</span></div>
+          </div>
+          <div class="file-status">✓ Ready</div>
+        </div>
+
+        <div class="file-row complete">
+          <div class="file-icon">PDF</div>
+          <div class="file-info">
+            <div class="file-name">techcorp-nda.pdf</div>
+            <div class="file-meta"><span>4 pages</span><span>·</span><span>180 KB</span></div>
+          </div>
+          <div class="file-status">✓ Ready</div>
+        </div>
+
+        <div class="file-row complete">
+          <div class="file-icon">PDF</div>
+          <div class="file-info">
+            <div class="file-name">saas-agreement-q2.pdf</div>
+            <div class="file-meta"><span>16 pages</span><span>·</span><span>740 KB</span></div>
+          </div>
+          <div class="file-status">✓ Ready</div>
+        </div>
+
+        <div class="file-row">
+          <div class="file-icon">PDF</div>
+          <div class="file-info">
+            <div class="file-name">employment-carter.pdf</div>
+            <div class="file-meta"><span>8 pages</span><span>·</span><span>320 KB</span></div>
+          </div>
+          <div class="file-status">68%</div>
+          <div class="file-progress">
+            <div class="file-progress-bar" style="width: 68%;"></div>
+          </div>
+        </div>
+
+        <div class="file-row">
+          <div class="file-icon">PDF</div>
+          <div class="file-info">
+            <div class="file-name">vendor-msa-acme.pdf</div>
+            <div class="file-meta"><span>22 pages</span><span>·</span><span>980 KB</span></div>
+          </div>
+          <div class="file-status">23%</div>
+          <div class="file-progress">
+            <div class="file-progress-bar" style="width: 23%;"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="uploading-actions">
+        <div class="uploading-info">
+          <strong>3 of 5</strong> uploaded · files stay on this machine
+        </div>
+        <button class="btn">Cancel</button>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SCREEN 03: PROCESSING                        -->
+<!-- ============================================ -->
+<section class="screen" data-screen="processing">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Caveat</span>
+      <span class="brand-tag">AI</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-doc">acme-msa-v3.pdf <em>· analyzing</em></div>
+    <div class="topbar-status">
+      <div class="status-pill working"><span class="dot"></span>Working · ~40s left</div>
+      <div class="status-pill"><span class="dot"></span>0 network requests</div>
+    </div>
+  </header>
+
+  <div class="processing-screen">
+    <div class="processing-wrap">
+
+      <div class="processing-doc-pill">
+        <span class="name">acme-msa-v3.pdf</span>
+        <span class="meta">28 pages · 4,712 words · classified MSA</span>
+      </div>
+
+      <h2 class="processing-title">Reading <em>carefully.</em></h2>
+      <p class="processing-sub">Gemma 4 is parsing 28 pages and cross-referencing your MSA playbook.</p>
+
+      <div class="pipeline">
+        <div class="pipe-step done">
+          <span class="pipe-num"><span>01</span></span>
+          <span>Parse PDF and extract structured sections</span>
+          <span class="pipe-time">2.1s</span>
+        </div>
+        <div class="pipe-step done">
+          <span class="pipe-num"><span>02</span></span>
+          <span>Classify contract type</span>
+          <span class="pipe-time">3.4s</span>
+        </div>
+        <div class="pipe-step done">
+          <span class="pipe-num"><span>03</span></span>
+          <span>Load MSA playbook from local library</span>
+          <span class="pipe-time">0.1s</span>
+        </div>
+        <div class="pipe-step active">
+          <span class="pipe-num">04</span>
+          <span>Identify risk clauses and missing provisions</span>
+          <span class="pipe-time">running</span>
+        </div>
+        <div class="pipe-step pending">
+          <span class="pipe-num">05</span>
+          <span>Validate citations against source text</span>
+          <span class="pipe-time">queued</span>
+        </div>
+        <div class="pipe-step pending">
+          <span class="pipe-num">06</span>
+          <span>Generate plain-English client summary</span>
+          <span class="pipe-time">queued</span>
+        </div>
+      </div>
+
+      <div class="processing-note">
+        <strong>Privileged work product. </strong> Computation is happening on this device only. You can disconnect from Wi-Fi without affecting the result.
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SCREEN 04: REVIEW (the main app)             -->
+<!-- ============================================ -->
+<section class="screen" data-screen="review">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Caveat</span>
+      <span class="brand-tag">AI</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-doc">acme-msa-v3.pdf <em>· MSA · 28 pages</em></div>
+    <div class="topbar-status">
+      <div class="status-pill"><span class="dot"></span>Local · Gemma 4 31B</div>
+      <div class="status-pill"><span class="dot"></span>0 network requests</div>
+      <button class="btn primary">Export →</button>
+    </div>
+  </header>
+
+  <div class="app">
+
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">
+          <span>Documents</span>
+          <span class="count">5</span>
+        </div>
+
+        <div class="doc-item active">
+          <div class="doc-item-head">
+            <div class="doc-icon">PDF</div>
+            <div class="doc-name">acme-msa-v3</div>
+          </div>
+          <div class="doc-meta">
+            <span class="risk-high">3↑</span>
+            <span class="risk-med">5</span>
+            <span>· 28p</span>
+          </div>
+        </div>
+
+        <div class="doc-item">
+          <div class="doc-item-head">
+            <div class="doc-icon">PDF</div>
+            <div class="doc-name">techcorp-nda</div>
+          </div>
+          <div class="doc-meta">
+            <span class="risk-med">2</span>
+            <span>· 4p</span>
+          </div>
+        </div>
+
+        <div class="doc-item">
+          <div class="doc-item-head">
+            <div class="doc-icon">PDF</div>
+            <div class="doc-name">saas-agreement-q2</div>
+          </div>
+          <div class="doc-meta">
+            <span class="risk-high">1↑</span>
+            <span class="risk-med">3</span>
+            <span>· 16p</span>
+          </div>
+        </div>
+
+        <div class="doc-item">
+          <div class="doc-item-head">
+            <div class="doc-icon">PDF</div>
+            <div class="doc-name">employment-carter</div>
+          </div>
+          <div class="doc-meta">
+            <span class="risk-med">1</span>
+            <span>· 8p</span>
+          </div>
+        </div>
+
+        <div class="doc-item">
+          <div class="doc-item-head">
+            <div class="doc-icon">PDF</div>
+            <div class="doc-name">vendor-msa-acme</div>
+          </div>
+          <div class="doc-meta">
+            <span class="risk-med">4</span>
+            <span>· 22p</span>
+          </div>
+        </div>
+
+        <button class="add-btn">+ Add document</button>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="privacy-note">
+          <strong>Privileged work product</strong>
+          Nothing leaves this machine. Run airplane mode if you'd like — it doesn't matter.
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="findings">
+          Findings
+          <span class="badge danger">12</span>
+        </button>
+        <button class="tab" data-tab="summary">Client summary</button>
+        <button class="tab" data-tab="source">
+          Source
+          <span class="badge">28p</span>
+        </button>
+        <button class="tab" data-tab="chat">
+          Chat
+          <span class="badge">3</span>
+        </button>
+        <div class="tab-spacer"></div>
+        <div class="tab-actions">
+          <button class="btn">Re-analyze</button>
+        </div>
+      </nav>
+
+      <div class="content">
+
+        <div class="pane active" data-pane="findings">
+          <div class="findings-wrap">
+
+            <div class="pane-header">
+              <div class="pane-eyebrow">Tab 01 · technical analysis</div>
+              <h1 class="pane-title">Twelve things <em>worth knowing.</em></h1>
+              <p class="pane-lead">
+                Each finding cites exact language from the contract. Click "Accept" to add a redline to your export package, or open Chat to dig into any of them.
+              </p>
+            </div>
+
+            <div class="findings-summary">
+              <div class="summary-cell danger"><div class="label">High risk</div><div class="value">3</div></div>
+              <div class="summary-cell warn"><div class="label">Medium</div><div class="value">5</div></div>
+              <div class="summary-cell"><div class="label">Missing clauses</div><div class="value">4</div></div>
+              <div class="summary-cell"><div class="label">Analysis time</div><div class="value">43.7s</div></div>
+            </div>
+
+            <div class="filter-row">
+              <span class="filter-label">Show</span>
+              <button class="filter-chip active">All 12</button>
+              <button class="filter-chip">High only</button>
+              <button class="filter-chip">Missing</button>
+              <button class="filter-chip">Accepted (0)</button>
+            </div>
+
+            <div class="finding">
+              <div class="finding-head">
+                <span class="severity high">High</span>
+                <span class="finding-title">Liability cap is dangerously low</span>
+                <span class="finding-ref">§ 4.2</span>
+              </div>
+              <div class="finding-body">
+                <div class="finding-quote">
+                  In no event shall either party's aggregate liability […] exceed the amounts paid by Customer to Provider in the three (3) months preceding the event giving rise to the claim.
+                </div>
+                <div class="finding-explain">
+                  A 3-month rolling cap is well below market for an MSA of this size. <strong>Industry norm</strong> sits at 12 months of fees, with a higher multiple (often 2x) reserved for breaches of confidentiality, IP, and indemnification obligations.
+                </div>
+                <div class="finding-redline">
+                  <div class="redline-label">↳ Suggested redline</div>
+                  <div class="redline-text">
+                    <del>three (3) months</del> <ins>twelve (12) months</ins> preceding the event giving rise to the claim<ins>; provided that the foregoing limitation shall not apply to (i) breach of confidentiality, (ii) indemnification obligations, or (iii) gross negligence or willful misconduct, for which liability shall be capped at two (2) times the foregoing amount</ins>.
+                  </div>
+                </div>
+                <div class="finding-actions">
+                  <button class="mini-btn accept">✓ Accept</button>
+                  <button class="mini-btn">Edit</button>
+                  <button class="mini-btn">Ask in chat</button>
+                  <button class="mini-btn reject">✕ Dismiss</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="finding">
+              <div class="finding-head">
+                <span class="severity high">High</span>
+                <span class="finding-title">One-way indemnification</span>
+                <span class="finding-ref">§ 5.1</span>
+              </div>
+              <div class="finding-body">
+                <div class="finding-quote">
+                  Customer shall defend, indemnify and hold harmless Provider […] from and against any and all claims […] arising out of or related to Customer's use of the Services.
+                </div>
+                <div class="finding-explain">
+                  Indemnification flows only one direction — Customer protects Provider, but Provider does not reciprocate. <strong>Standard practice</strong> is mutual indemnification at minimum, with Provider specifically indemnifying Customer for third-party IP infringement claims.
+                </div>
+                <div class="finding-actions">
+                  <button class="mini-btn accept">✓ Accept</button>
+                  <button class="mini-btn">Edit</button>
+                  <button class="mini-btn">Ask in chat</button>
+                  <button class="mini-btn reject">✕ Dismiss</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="finding">
+              <div class="finding-head">
+                <span class="severity med">Medium</span>
+                <span class="finding-title">Termination forfeits prepaid amounts</span>
+                <span class="finding-ref">§ 7.3</span>
+              </div>
+              <div class="finding-body">
+                <div class="finding-quote">
+                  Upon termination, all amounts paid by Customer shall be non-refundable, regardless of the reason for termination.
+                </div>
+                <div class="finding-explain">
+                  Combined with Provider's unilateral right to terminate for convenience on 30 days' notice (same section), this clause permits Provider to keep prepaid fees with no service obligation. <strong>Recommend</strong> pro-rata refund on Provider-initiated termination.
+                </div>
+                <div class="finding-actions">
+                  <button class="mini-btn accept">✓ Accept</button>
+                  <button class="mini-btn">Edit</button>
+                  <button class="mini-btn">Ask in chat</button>
+                  <button class="mini-btn reject">✕ Dismiss</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="finding">
+              <div class="finding-head">
+                <span class="severity missing">Missing</span>
+                <span class="finding-title">No data processing addendum</span>
+                <span class="finding-ref">—</span>
+              </div>
+              <div class="finding-body">
+                <div class="finding-explain">
+                  The contract does not contemplate a Data Processing Addendum (DPA), even though §3.4 references Customer Data being processed by Provider's systems. <strong>Required</strong> if either party operates under GDPR, CCPA, or analogous regimes.
+                </div>
+                <div class="finding-actions">
+                  <button class="mini-btn accept">✓ Insert template</button>
+                  <button class="mini-btn">Ask in chat</button>
+                  <button class="mini-btn reject">✕ Dismiss</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="pane" data-pane="summary">
+          <div class="summary-wrap">
+            <div class="pane-header">
+              <div class="pane-eyebrow">Tab 02 · for your client</div>
+              <h1 class="pane-title">A version your client <em>actually reads.</em></h1>
+              <p class="pane-lead">Plain English. Three risks named in order. A clear recommendation. Edit before sending.</p>
+            </div>
+
+            <div class="client-doc">
+              <div class="client-doc-head">
+                <div class="firm">Carter &amp; Voss LLP · Memo</div>
+                <div class="title">Re: Acme Master Services Agreement</div>
+              </div>
+
+              <h3>What this contract is</h3>
+              <p>This is a Master Services Agreement that governs your ongoing relationship with Acme. It sets the rules for how you'll receive their services, how much you'll pay, and what happens if things go wrong.</p>
+
+              <h3>What you're committing to</h3>
+              <ul>
+                <li>Pay Acme on time, in advance, for all services.</li>
+                <li>Cover Acme's legal costs if anyone sues them over how <em>you</em> use their service — even if Acme is partly at fault.</li>
+                <li>Resolve any disputes in Delaware courts.</li>
+              </ul>
+
+              <h3>The three biggest risks</h3>
+              <ul>
+                <li><strong>If Acme makes a mistake that costs you money,</strong> they'll only owe you up to three months of fees. That's unusually low.</li>
+                <li><strong>Acme can cancel on you with 30 days' notice</strong> and keep everything you've already paid, without giving back the unused portion.</li>
+                <li><strong>If something goes wrong with data privacy,</strong> the contract has no protections in place — it doesn't even acknowledge data laws like GDPR or CCPA.</li>
+              </ul>
+
+              <div class="verdict">
+                <div class="verdict-label">Recommendation</div>
+                <div class="verdict-text">Do not sign as-is. Negotiate the three items above before executing.</div>
+              </div>
+
+              <div class="disclaimer">
+                This summary is generated locally by Caveat AI from a draft Acme provided. It is a tool to support — not replace — independent review by your attorney, who has reviewed the full contract and approved this summary before sending.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pane" data-pane="source">
+          <div class="source-wrap">
+            <div class="pane-header">
+              <div class="pane-eyebrow">Tab 03 · the original</div>
+              <h1 class="pane-title">The contract, <em>annotated.</em></h1>
+              <p class="pane-lead">Risk passages are highlighted. Click any highlight to jump to its finding.</p>
+            </div>
+
+            <div class="source-doc">
+              <div class="source-section">
+                <div class="source-section-num">§ 4.2 — Limitation of Liability</div>
+                <div class="source-section-title">Limitation of Liability</div>
+                <div class="source-text">
+                  <mark class="danger">In no event shall either party's aggregate liability arising out of or related to this Agreement exceed the amounts paid by Customer to Provider in the three (3) months preceding the event giving rise to the claim.</mark> The foregoing limitations shall apply notwithstanding the failure of any limited remedy of its essential purpose, and shall apply regardless of the form of action.
+                </div>
+              </div>
+
+              <div class="source-section">
+                <div class="source-section-num">§ 5.1 — Indemnification</div>
+                <div class="source-section-title">Indemnification</div>
+                <div class="source-text">
+                  <mark class="danger">Customer shall defend, indemnify and hold harmless Provider, its affiliates, and their respective officers, directors, employees and agents from and against any and all claims, damages, losses, liabilities, costs and expenses (including reasonable attorneys' fees) arising out of or related to Customer's use of the Services.</mark>
+                </div>
+              </div>
+
+              <div class="source-section">
+                <div class="source-section-num">§ 7.3 — Termination</div>
+                <div class="source-section-title">Termination for Convenience</div>
+                <div class="source-text">
+                  Provider may terminate this Agreement at any time and for any reason, or for no reason, upon thirty (30) days' written notice to Customer. <mark>Upon termination, all amounts paid by Customer shall be non-refundable, regardless of the reason for termination or the portion of the Term that remains unfulfilled.</mark>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pane" data-pane="chat">
+          <div class="chat-wrap">
+            <div class="chat-header">
+              <div class="chat-eyebrow">Tab 04 · ask anything</div>
+              <h2 class="chat-title">Talk to <em>your contracts.</em></h2>
+              <p class="chat-sub">Compare clauses across documents, draft tougher redlines, extract data into tables. Every answer cites the source.</p>
+
+              <div class="chat-context">
+                <strong>Context:</strong> 5 documents loaded · ~74,000 tokens of 128,000 used
+              </div>
+            </div>
+
+            <div class="chat-messages">
+
+              <div class="msg bot">
+                <div class="msg-author">Caveat</div>
+                <div class="msg-bubble">
+                  I've read all 5 contracts you uploaded. Ask me anything — comparisons, extractions, clause rewrites, or just ideas to push back harder. Try one of the suggestions below to start.
+                </div>
+              </div>
+
+              <div class="msg user">
+                <div class="msg-author">You</div>
+                <div class="msg-bubble">
+                  Which of these contracts has the most aggressive limitation of liability? Show me side by side.
+                </div>
+              </div>
+
+              <div class="msg bot">
+                <div class="msg-author">Caveat</div>
+                <div class="msg-bubble">
+                  <strong>acme-msa-v3</strong> is the harshest by a wide margin. It caps mutual liability at <em>3 months</em> of fees, vs. the 12-month industry norm. Side by side:
+                  <table class="msg-table">
+                    <thead>
+                      <tr><th>Document</th><th>Cap basis</th><th>Carve-outs</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>acme-msa-v3</td><td class="num">3 months fees</td><td>None</td></tr>
+                      <tr><td>vendor-msa-acme</td><td class="num">12 months fees</td><td>Confidentiality, IP</td></tr>
+                      <tr><td>saas-agreement-q2</td><td class="num">$500,000 fixed</td><td>Gross negligence</td></tr>
+                    </tbody>
+                  </table>
+                  <div class="msg-citation">
+                    <span class="src">acme-msa-v3 · § 4.2</span>
+                    In no event shall either party's aggregate liability […] exceed the amounts paid by Customer to Provider in the three (3) months preceding the event giving rise to the claim.
+                  </div>
+                </div>
+              </div>
+
+              <div class="msg user">
+                <div class="msg-author">You</div>
+                <div class="msg-bubble">
+                  Draft a more aggressive redline of acme §4.2 — I want at least 24 months and full carve-outs.
+                </div>
+              </div>
+
+              <div class="msg bot">
+                <div class="msg-author">Caveat</div>
+                <div class="msg-bubble">
+                  Here's a tougher version. I've added the standard four carve-outs (confidentiality, IP, indemnification, willful misconduct) and made them <em>uncapped</em> rather than 2x:
+                  <div class="msg-citation" style="border-left-color: var(--safe);">
+                    <span class="src" style="color: var(--safe);">Proposed § 4.2 — aggressive variant</span>
+                    In no event shall either party's aggregate liability arising out of or related to this Agreement exceed the amounts paid by Customer to Provider in the <strong>twenty-four (24)</strong> months preceding the event giving rise to the claim; <strong>provided, however, that the foregoing limitation shall not apply to liability arising from (i) breach of confidentiality, (ii) infringement of intellectual property rights, (iii) indemnification obligations, or (iv) gross negligence or willful misconduct, in each of which cases liability shall be uncapped.</strong>
+                  </div>
+                  Want me to add this directly to the export package, or keep iterating?
+                </div>
+              </div>
+
+            </div>
+
+            <div class="chat-composer">
+              <div class="suggestions">
+                <button class="suggestion"><span class="icon">⇄</span>Compare termination clauses across all 5</button>
+                <button class="suggestion"><span class="icon">⊞</span>Extract all payment terms as a table</button>
+                <button class="suggestion"><span class="icon">↓</span>What's missing that should be here?</button>
+              </div>
+
+              <div class="composer-wrap">
+                <textarea class="composer-input" placeholder="Ask anything about the loaded contracts…" rows="2"></textarea>
+                <div class="composer-bar">
+                  <button class="composer-chip">@all docs</button>
+                  <button class="composer-chip">/cite</button>
+                  <button class="composer-chip">/redline</button>
+                  <button class="composer-send">↑</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+</section>
+
+<!-- ============================================ -->
+<!-- SCREEN 05: EXPORT                            -->
+<!-- ============================================ -->
+<section class="screen" data-screen="export">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Caveat</span>
+      <span class="brand-tag">AI</span>
+    </div>
+    <div class="topbar-divider"></div>
+    <div class="topbar-doc">acme-msa-v3.pdf <em>· export package</em></div>
+    <div class="topbar-status">
+      <div class="status-pill"><span class="dot"></span>Local · Gemma 4 31B</div>
+      <button class="btn">← Back to review</button>
+    </div>
+  </header>
+
+  <div class="export-screen">
+    <div class="export-wrap">
+
+      <div class="export-config">
+        <div class="export-eyebrow">Step 05 · deliver</div>
+        <h2 class="export-title">Send it the way <em>you would.</em></h2>
+        <p class="export-sub">
+          Your firm letterhead, your signature, your file naming convention. Caveat fills in the document — you stay the author.
+        </p>
+
+        <div class="format-list">
+          <div class="format-item selected">
+            <div class="format-glyph">W</div>
+            <div class="format-info">
+              <div class="name">Microsoft Word memo</div>
+              <div class="desc">Editable .docx with letterhead and citations.</div>
+            </div>
+            <div class="format-check"></div>
+          </div>
+          <div class="format-item selected">
+            <div class="format-glyph">P</div>
+            <div class="format-info">
+              <div class="name">Signed PDF for client file</div>
+              <div class="desc">Locked .pdf, suitable for matter records.</div>
+            </div>
+            <div class="format-check"></div>
+          </div>
+          <div class="format-item">
+            <div class="format-glyph">R</div>
+            <div class="format-info">
+              <div class="name">Redline package</div>
+              <div class="desc">Annotated original Word file with track-changes.</div>
+            </div>
+            <div class="format-check"></div>
+          </div>
+          <div class="format-item">
+            <div class="format-glyph">@</div>
+            <div class="format-info">
+              <div class="name">Email-ready blurb</div>
+              <div class="desc">Short message you can paste into Outlook or Gmail.</div>
+            </div>
+            <div class="format-check"></div>
+          </div>
+        </div>
+
+        <div class="send-options">
+          <div class="send-options-label">Save to</div>
+          <div class="send-row">
+            <input class="send-input" value="~/Matters/Acme/2026-05/" />
+            <button class="btn burgundy">Generate</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-preview">
+        <div class="doc-letterhead">
+          <div class="firm-name">CARTER &amp; VOSS LLP</div>
+          <div class="firm-meta">attorneys at law · 1740 broadway · new york</div>
+        </div>
+
+        <div class="doc-meta-grid">
+          <div class="doc-meta-item">
+            <div class="label">To</div>
+            <div class="val">M. Reyes, General Counsel — Beacon Health Inc.</div>
+          </div>
+          <div class="doc-meta-item">
+            <div class="label">From</div>
+            <div class="val">D. Carter, Esq. — NY Bar No. 4127801</div>
+          </div>
+          <div class="doc-meta-item">
+            <div class="label">Re</div>
+            <div class="val">Acme Master Services Agreement, draft v3</div>
+          </div>
+          <div class="doc-meta-item">
+            <div class="label">Date</div>
+            <div class="val">May 8, 2026</div>
+          </div>
+        </div>
+
+        <div class="doc-h1">Memorandum of Review</div>
+
+        <div class="doc-h2">I. Summary</div>
+        <p class="doc-p">
+          The proposed Master Services Agreement ("MSA") presented by Acme Inc. departs from prevailing market practice in three material respects, each of which exposes Beacon Health to disproportionate risk. We recommend that the Agreement <strong>not be executed in its current form</strong> and that the items below be negotiated as conditions to signing.
+        </p>
+
+        <div class="doc-h2">II. Material Findings</div>
+        <p class="doc-p"><strong>A. Limitation of Liability (§ 4.2).</strong> The mutual aggregate liability cap is set at three months of fees paid:</p>
+        <div class="doc-quote">
+          In no event shall either party's aggregate liability […] exceed the amounts paid by Customer to Provider in the three (3) months preceding the event giving rise to the claim.
+        </div>
+        <p class="doc-p">This cap is meaningfully below the twelve-month standard observed in comparable MSAs. Recommend revision with carve-outs for confidentiality, indemnification, and willful misconduct.</p>
+
+        <p class="doc-p"><strong>B. Indemnification (§ 5.1).</strong> Indemnification obligations run only from Customer to Provider. We recommend conversion to a mutual structure with a Provider-side IP infringement indemnity.</p>
+
+        <div class="doc-sig">
+          Respectfully submitted,<br><br>
+          <span class="name">Daniel Carter, Esq.</span><br>
+          <span class="reg">Carter &amp; Voss LLP · NY Bar No. 4127801</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<script>
+  // Prototype navigation
+  const navBtns = document.querySelectorAll('.proto-nav-btn');
+  const screens = document.querySelectorAll('.screen');
+  navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.screen;
+      navBtns.forEach(b => b.classList.toggle('active', b.dataset.screen === target));
+      screens.forEach(s => s.classList.toggle('active', s.dataset.screen === target));
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  });
+
+  // Tab switching inside review screen
+  const tabs = document.querySelectorAll('.tab');
+  const panes = document.querySelectorAll('.pane');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === target));
+      panes.forEach(p => p.classList.toggle('active', p.dataset.pane === target));
+    });
+  });
+
+  // Doc switching in sidebar (visual only)
+  const docs = document.querySelectorAll('.doc-item');
+  docs.forEach(doc => {
+    doc.addEventListener('click', () => {
+      docs.forEach(d => d.classList.remove('active'));
+      doc.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
