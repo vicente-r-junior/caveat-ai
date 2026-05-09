@@ -74,6 +74,22 @@ CAVEAT_MODEL=gemma4:31b-instruct-q4_K_M just start
 Hardware auto-detection (Sprint 5) will replace this manual switch with first-launch
 capability detection — until then, the operator picks explicitly.
 
+### Optional: warm the model at startup (snappier first analyze)
+
+The first analyze call after `ollama serve` starts pays a cold-start
+penalty while the model loads into RAM (≈1–3 minutes for E4B on an M4
+Air, longer for 31B). If you want the very first upload to feel as fast
+as the second one — useful for demos — set `CAVEAT_WARMUP_ON_STARTUP=true`:
+
+```bash
+CAVEAT_WARMUP_ON_STARTUP=true just start
+```
+
+The backend will fire a tiny "Say 'ok'." generate() during lifespan
+startup. Boot takes longer, but the first real analyze is already warm.
+Off by default to keep test/CI startup fast and to avoid blocking on
+Ollama when you're just developing the API.
+
 ## Architecture in one diagram
 
 ```

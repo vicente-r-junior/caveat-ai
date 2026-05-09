@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8787
     data_dir: Path = Field(default_factory=lambda: Path.home() / ".caveat")
+    # Optional: fire a tiny generate() at startup to force the model into
+    # RAM so the first real analyze isn't a 2-3 minute cold-start. Off by
+    # default to keep test/CI startup fast (Constitution X budget); turn
+    # on for demo/dev runs with `CAVEAT_WARMUP_ON_STARTUP=true`.
+    warmup_on_startup: bool = False
 
 
 @lru_cache(maxsize=1)

@@ -215,11 +215,19 @@ DOC_ID=<from scenario 2>
 time curl -s -X POST http://localhost:8787/api/analyze/$DOC_ID | python3 -m json.tool
 ```
 
-**Expected**:
-- HTTP 200, response time on M4 Air typically 30–90 seconds (gemma4:e4b is the fallback model; expect higher latency than the production target gemma4:31b).
+**Expected wall-clock (M4 Air 24GB, `gemma4:e4b`):**
+
+- **Cold start** — *the first analyze after `ollama serve` was started*: up to **~4 minutes** while the ~9.6 GB model loads into RAM. This is acceptable; it's not a regression. The httpx read timeout in `caveat/llm/ollama_client.py` is set to 300s specifically to cover this case (see calibration comment in that file).
+- **Warm** — every subsequent analyze in the same Ollama session: **30–120 seconds**. This is the steady-state number and is what you should compare against the 60s budget in Constitution VII (which is calibrated for the production target `gemma4:31b` on 32GB+ RAM with GPU; E4B on a laptop is the fallback, so going over is expected).
+- If you want the very first analyze to also feel snappy (e.g. for the demo), start the backend with `CAVEAT_WARMUP_ON_STARTUP=true` so the lifespan hook fires a tiny generate() at boot and the model is already in RAM by the time you upload a contract.
+
+**Expected response shape (cold or warm):**
+- HTTP 200.
 - Top-level fields: `document_id`, `contract_type` (probably `"MSA"`), `findings` (list, ≥ 3 entries), `client_summary` (object with 5 fields), `warnings` (list, may be empty), `elapsed_seconds` (number).
 - Each finding has: `severity` (`"high"` / `"medium"` / `"low"` / `"missing"`), `title`, `quote`, `explanation`, `redline` (may be empty).
 - `client_summary` has: `what_this_contract_is`, `what_youre_committing_to`, `biggest_risks` (list of up to 3), `recommendation`, **`disclaimer`** (must mention "attorney review" — Constitution IV).
+
+**If you see HTTP 500 with `httpx.ReadTimeout` in the backend logs**: the timeout was tripped. With the 300s default this should only happen on hardware significantly slower than the M4 Air, or on cold-starts of the larger 31B model. File a calibration issue rather than papering over it (Constitution VI).
 
 ### Scenario 4 — Verify quote of every finding exists in source PDF text
 

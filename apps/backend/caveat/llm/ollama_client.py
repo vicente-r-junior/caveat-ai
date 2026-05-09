@@ -26,10 +26,20 @@ from caveat.config import get_settings
 OLLAMA_BASE_URL = "http://localhost:11434"
 """Hard-coded Ollama URL. Constitution I forbids any other host."""
 
-_DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=120.0, write=10.0, pool=5.0)
+_DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=300.0, write=10.0, pool=5.0)
 """Generous read timeout: per Constitution VII a 30-page contract may take
 ~60s, so we give the pipeline meaningful headroom before declaring the
-daemon hung."""
+daemon hung.
+
+Calibration note: 300s (not 60s) because the *first* analyze call after
+``ollama serve`` starts has to load the model into RAM. On the dev
+hardware (E4B / M4 Air 24GB, ~9.6 GB model) cold-start has been measured
+at >2 minutes wall-clock; warm calls land at 30-90s. The production
+target (gemma4:31b on 32GB+ RAM with GPU) is faster warm but also pays
+a cold-start penalty on first load. We pick the timeout for the worst
+realistic case (cold E4B on a laptop) so a real run never trips httpx
+before the model has even finished loading. Per Constitution VI we'd
+rather wait visibly than fail with an opaque ReadTimeout."""
 
 
 class OllamaError(Exception):

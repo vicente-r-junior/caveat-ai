@@ -22,6 +22,7 @@ import httpx
 import pytest
 
 from caveat.config import get_settings
+from caveat.llm import ollama_client
 from caveat.llm.ollama_client import (
     OLLAMA_BASE_URL,
     OllamaInvalidJSONError,
@@ -180,3 +181,17 @@ def test_generate_json_rejects_non_object() -> None:
 
     with pytest.raises(OllamaInvalidJSONError):
         generate_json("prompt")
+
+
+def test_default_read_timeout_calibrated_for_e4b_cold_start() -> None:
+    """The httpx read timeout must be 300s, not 120s.
+
+    Calibrated for E4B (~9.6 GB) cold-start on dev hardware: the *first*
+    analyze call after ``ollama serve`` starts has been measured >2
+    minutes wall-clock on M4 Air while the model loads into RAM. Sprint 1
+    manual validation tripped a 120s timeout on this exact path. Pin the
+    value here so a future "looks too long, let me lower it" tweak fails
+    a test instead of the demo.
+    """
+    timeout = ollama_client._DEFAULT_TIMEOUT
+    assert timeout.read == 300.0, f"expected read timeout 300s, got {timeout.read}"

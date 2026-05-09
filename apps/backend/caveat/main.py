@@ -18,6 +18,7 @@ not race against a missing table.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -26,6 +27,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from caveat.config import get_settings
+from caveat.llm import ollama_client
+from caveat.llm.ollama_client import OllamaError
 from caveat.routers import analyze, documents, health
 from caveat.storage.db import get_db_path, init_db
 
@@ -45,6 +48,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings.model_name,
         get_db_path(),
     )
+
+    # Optional model warmup. The first analyze after `ollama serve` starts
+    # pays a 1-3 minute cold-start while the model loads into RAM (E4B is
+    # ~9.6 GB). When CAVEAT_WARMUP_ON_STARTUP=true we pay that cost here
+    # so the first real analyze is warm. Off by default — tests must not
+    # block on a real Ollama daemon. Failures are logged and swallowed:
+    # if the daemon is unavailable at boot, that's a runtime concern the
+    # analyze router will surface as a clean 503 later.
+    if settings.warmup_on_startup:
+        try:
+            await asyncio.to_thread(
+                ollama_client.generate,
+                "Say 'ok'.",
+                options={"num_predict": 5},
+            )
+            logger.info("ollama warmup complete (model=%s)", settings.model_name)
+        except OllamaError as exc:
+            logger.warning("ollama warmup failed: %s", exc)
     yield
 
 
