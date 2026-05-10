@@ -9,9 +9,10 @@ trivially auditable.
 
 Per Constitution VI (Honesty over polish), parsing failures surface as
 explicit exceptions (:class:`OllamaInvalidJSONError`,
-:class:`OllamaUnreachableError`, :class:`OllamaTimeoutError`) rather than
-empty defaults. Callers are expected to handle them — silent retries are
-the caller's decision, not this module's.
+:class:`OllamaUnreachableError`, :class:`OllamaTimeoutError`,
+:class:`OllamaServerError`) rather than empty defaults. Callers are
+expected to handle them — silent retries are the caller's decision, not
+this module's.
 """
 
 from __future__ import annotations
@@ -97,6 +98,55 @@ class OllamaInvalidJSONError(OllamaError):
         self.raw_response: str = raw_response
 
 
+class OllamaServerError(OllamaError):
+    """Raised when the Ollama daemon returns a non-2xx HTTP response.
+
+    The most common trigger we observe in dev is HTTP 500 from the
+    ``/api/generate`` endpoint after the underlying ``llama runner``
+    subprocess crashes mid-inference (``exit status 2`` — typically a
+    segfault). The Ollama daemon itself stays up, but the in-flight
+    generation call fails. Sprint 2 fixup-3 closed the
+    :class:`OllamaTimeoutError` gap; this closes the parallel
+    ``HTTPStatusError`` gap that was bubbling out as opaque HTTP 500 with
+    stack trace.
+
+    Carries:
+
+    * ``status_code`` — the upstream HTTP status (e.g. ``500``) so the
+      router can map it to a semantically correct gateway-error response
+      and the warning copy can name the actual status the user saw.
+    * ``body_snippet`` — up to 500 characters of the upstream response
+      body, useful when debugging which subsystem of Ollama crashed
+      (the runner log path, exit code, etc. typically appear here).
+    * ``elapsed_seconds`` — the wall-clock time at the moment the failure
+      surfaced, mirroring :class:`OllamaTimeoutError` so the warning copy
+      can describe the wait the user endured before the crash hit.
+    """
+
+    _SNIPPET_MAX = 500
+    """Hard cap on how many bytes of the upstream body we carry. The body
+    is mostly diagnostic noise (Go panic traces, llama runner stderr) and
+    the user-facing warning quotes the status code, not the snippet —
+    500 chars is enough for a developer log line without bloating the
+    warning channel or the FastAPI ``detail`` field."""
+
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        body_snippet: str,
+        elapsed_seconds: float,
+    ) -> None:
+        super().__init__(
+            f"Ollama returned HTTP {status_code} after "
+            f"{elapsed_seconds:.1f}s. The model runner may have crashed "
+            "mid-inference (most common with E4B on long-context contracts)."
+        )
+        self.status_code: int = status_code
+        self.body_snippet: str = body_snippet[: self._SNIPPET_MAX]
+        self.elapsed_seconds: float = elapsed_seconds
+
+
 _DEBUG_TRUNCATE_CHARS = 4000
 """Hard cap on how much prompt/response text the debug emitter will print.
 
@@ -172,8 +222,12 @@ def generate(
         If the read/connect/write timeout fires before Ollama responds.
         Carries the elapsed wall-clock seconds so callers can surface a
         verbatim warning that names the actual wait the user endured.
-    httpx.HTTPStatusError
-        If Ollama returns a non-2xx status.
+    OllamaServerError
+        If Ollama returns a non-2xx status (e.g. HTTP 500 when the
+        ``llama runner`` subprocess crashes mid-inference). Carries the
+        upstream status code, a body snippet, and the elapsed wall-clock
+        seconds. The pipeline stages catch this and surface a structured
+        warning; the router maps it to HTTP 502 — never 500.
     """
     resolved_model = _resolve_model(model)
     payload: dict[str, Any] = {
@@ -212,7 +266,39 @@ def generate(
         kind = type(exc).__name__.removesuffix("Timeout").lower() or "read"
         raise OllamaTimeoutError(elapsed_seconds=elapsed, timeout_kind=kind) from exc
 
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        # Sprint 2 fixup-4: when the llama runner subprocess crashes
+        # mid-inference (segfault — exit status 2 — most commonly observed
+        # with gemma4:e4b on long-context contracts), the Ollama daemon
+        # stays up but returns HTTP 500 for the in-flight /api/generate
+        # call. Pre-fixup, this surfaced as an opaque HTTP 500 with stack
+        # trace from FastAPI — Constitution VI violation, same shape as
+        # the timeout gap closed by fixup-3. Capture it as a typed
+        # exception that the pipeline stages can absorb into a structured
+        # warning, and that the router can map to HTTP 502 (Bad Gateway).
+        elapsed = time.perf_counter() - start
+        # response.text reads the buffered body; the body is short on
+        # Ollama errors (a few hundred bytes of JSON) so this is safe to
+        # call here. OllamaServerError truncates internally to 500 chars.
+        try:
+            body_snippet = response.text
+        except Exception:  # pragma: no cover — defensive only
+            # Pathological encoding errors on a body we already failed
+            # to decode shouldn't take down the warning path. We can
+            # always surface the status code without the snippet.
+            body_snippet = ""
+        _debug_emit(
+            f"!! HTTP {response.status_code} from Ollama after "
+            f"{elapsed:.1f}s | body={_truncate_for_debug(body_snippet)!r}"
+        )
+        raise OllamaServerError(
+            status_code=response.status_code,
+            body_snippet=body_snippet,
+            elapsed_seconds=elapsed,
+        ) from exc
+
     body: dict[str, Any] = response.json()
     text = body.get("response", "")
     if not isinstance(text, str):

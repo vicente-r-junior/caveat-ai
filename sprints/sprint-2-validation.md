@@ -7,6 +7,52 @@
 
 ---
 
+## Fixup-4 addendum (2026-05-10) — Upstream Ollama HTTP errors surface as warnings (Constitution VI)
+
+The fixup-3 changes shipped, but a re-run of manual scenario 8 against real Ollama on M4 Air hit a *third* failure mode that fixup-3 did not cover: the `llama runner` subprocess crashed mid-inference (segfault — `exit status 2`) and the Ollama daemon returned **HTTP 500** for the `/api/generate` call while staying up itself. Pre-fixup-4 the backend turned that into HTTP 500 with a stack trace, exposing the user to internals — the *exact* shape fixup-3 was supposed to prevent, just via `httpx.HTTPStatusError` instead of `httpx.ReadTimeout`.
+
+The Ollama server log on the M4 Air repro:
+
+```
+level=ERROR msg="llama runner terminated" error="exit status 2"
+[GIN] POST "/api/generate" → 500 (3m32s)
+[GIN] POST "/api/generate" → 500 (1m8s)
+[GIN] POST "/api/generate" → 500 (45.6s)
+```
+
+The daemon was reachable (so `OllamaUnreachableError` did not fire); the timeout did not trip (so `OllamaTimeoutError` did not fire); the JSON parser never ran because the response body was an upstream error (so `OllamaInvalidJSONError` did not fire). `httpx.HTTPStatusError` was the gap.
+
+**What changed in this fixup (surgical, scope-bounded):**
+
+- `apps/backend/caveat/llm/ollama_client.py`:
+  - New typed exception `OllamaServerError(OllamaError)` carrying `status_code`, `body_snippet` (≤500 chars of the upstream response body), and `elapsed_seconds` (mirroring `OllamaTimeoutError`).
+  - `generate()` now wraps `response.raise_for_status()` in a `try/except httpx.HTTPStatusError` block. On any non-2xx, the wrapper reads `response.text`, captures wall-clock via `time.perf_counter()`, emits a debug-LLM line for diagnostics, and re-raises as `OllamaServerError`. The `body_snippet` is truncated by the dataclass to keep the warning channel and the FastAPI `detail` field bounded (Go panic traces can run 10K+ chars; the most useful first lines fit easily in 500).
+- `apps/backend/caveat/pipeline/analyze.py`: catches `OllamaServerError` on both first pass and retry. Returns empty findings + a verbatim warning naming the upstream HTTP status, the elapsed seconds, and suggesting `gemma4:31b-instruct-q4_K_M` on capable hardware. The retry-path warning includes "on retry" so the lawyer sees which call failed.
+- `apps/backend/caveat/pipeline/client_summary.py`: catches `OllamaServerError`. Returns the four-field fallback memo (with the canonical disclaimer still attached — Constitution IV is invariant) and a warning that names the upstream status, the elapsed seconds, and the "Findings (if any) are still valid." copy.
+- `apps/backend/caveat/routers/analyze.py`: belt-and-suspenders `except OllamaServerError` → HTTP **502 Bad Gateway** with structured detail. 502 is the semantically correct status for "upstream service we depend on returned an error response" (vs. 504 for a timeout). Should never trigger in normal operation because the pipeline now absorbs the error into a warning.
+- `apps/backend/tests/unit/test_ollama_client.py`: four new tests — (a) HTTP 500 → `OllamaServerError` with status, snippet, elapsed populated; (b) HTTP 503 → same shape (pin the wrapper is generic over upstream status); (c) long body snippets are truncated at the 500-char cap; (d) `generate_json` propagates `OllamaServerError` unchanged. The `_FakeResponse` helper now carries a `text` attribute so tests can simulate realistic Ollama error bodies.
+- `apps/backend/tests/unit/test_analyze.py`: two new tests — first-pass server error → empty findings + warning naming `HTTP 500` and the elapsed seconds; retry server error → two warnings (retry-was-triggered + server-error-on-retry, with `on retry` and the upstream status both present).
+- `apps/backend/tests/unit/test_client_summary.py`: one new test — server error → fallback memo + canonical disclaimer + warning naming the upstream status, the elapsed seconds, and the "findings still valid" copy.
+
+**Frontend impact**: none. The warnings banner on `Findings.tsx` already renders `analyze.warnings` and `client_summary.warnings` verbatim above the summary cards (Sprint 2 work). The new warning strings flow through that channel unchanged.
+
+**Manual scenarios affected**:
+
+- **Scenario 3** (Processing screen during real analyze): on E4B hardware with an unstable runner, the analyze stage may now resolve quickly with a warning rather than pulse for the full 600s ceiling. The hold-pulse contract still holds; only the trip wire moved.
+- **Scenario 8** (the honest empty state): on E4B with a runner crash, the warnings banner may now show `"Analyze stage: Ollama returned HTTP 500 after 212.4s. The model runner may have crashed mid-inference, which is most common with E4B on long-context contracts. Consider using gemma4:31b-instruct-q4_K_M on capable hardware."` and/or `"Client summary: Ollama returned HTTP 500 after 58.3s. The model runner may have crashed mid-inference (most common with E4B on long contracts). Findings (if any) are still valid."` These are **expected outputs** under the new behavior, not regressions. The constitutional negatives still hold: nowhere on the page should the words "no risks" or "you're safe" appear.
+
+The **public API shape of `POST /api/analyze/{id}` is unchanged**: upstream HTTP errors on the pipeline stages still produce a normal `AnalyzeResponse` with `warnings[]` populated; only the previously-impossible "uncaught upstream error" path now returns 502 instead of 500. The citation validator and the no-network test guard were not touched.
+
+**Test counts after fixup-4**:
+- Backend unit: **91** tests (was 84), ~1.06s
+- Backend E2E: 13 tests (unchanged)
+- Frontend unit: 52 tests (unchanged)
+- Frontend E2E: 2 tests (unchanged)
+
+**Decision recorded for the rest of the sprint**: we are **not** running manual scenario 8 against real Ollama again. The E4B model is too unstable on the M4 Air to reliably reproduce the silent-empty path that motivated the original Constitution VI work, and Sprint 6 will use a capable model (`gemma4:31b-instruct-q4_K_M`) for the contest demo. The automated test suite plus the four Constitution VI capture paths in `ollama_client.py` (`OllamaUnreachableError`, `OllamaTimeoutError`, `OllamaInvalidJSONError`, `OllamaServerError`) are sufficient validation for Sprint 2 closure.
+
+---
+
 ## Fixup-3 addendum (2026-05-10) — Ollama timeouts surface as warnings (Constitution VI)
 
 The first manual run on `fixtures/contracts/msa-acme.pdf` with `gemma4:e4b` on M4 Air tripped an `httpx.ReadTimeout` during the **summary** stage (analyze had used ~150s of the previous 300s ceiling, leaving summary too little headroom). Pre-fixup, this surfaced as **HTTP 500 with stack trace** from the router — exactly the failure mode Sprint 1 fixup-2 was supposed to prevent. fixup-2 only handled `OllamaInvalidJSONError`; `httpx.ReadTimeout` was the gap.

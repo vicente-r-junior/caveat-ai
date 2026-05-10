@@ -272,3 +272,63 @@ def test_client_summary_handles_timeout_with_disclaimer_and_warning(
     # that upstream analyze work was not wasted.
     assert "findings" in msg.lower()
     assert "valid" in msg.lower()
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2 fixup-4 — Constitution VI: upstream Ollama HTTP errors during
+# the summary stage (e.g. HTTP 500 when the llama runner crashes
+# mid-inference) must surface as a structured warning + fallback memo
+# with the canonical disclaimer attached, not as HTTP 500 from the router.
+# ---------------------------------------------------------------------------
+
+
+def test_client_summary_handles_server_error_with_disclaimer_and_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A 500 during summary → fallback memo + disclaimer + verbatim warning.
+
+    The summary stage is the longest in the pipeline; a llama runner
+    crash here is a real failure mode on E4B / M4 Air. Pre-fixup-4 this
+    bubbled to the router as HTTP 500 with stack trace; now it surfaces
+    as a Constitution-IV-compliant fallback memo with the canonical
+    disclaimer attached AND a warning that names the upstream status
+    and elapsed seconds. Findings produced upstream remain valid — the
+    warning copy says so verbatim.
+    """
+    _patch_raises(
+        monkeypatch,
+        ollama_client.OllamaServerError(
+            status_code=500,
+            body_snippet="runner terminated: exit status 2",
+            elapsed_seconds=58.3,
+        ),
+    )
+
+    findings = [
+        Finding(
+            severity="high",
+            title="cap",
+            quote="Provider's cap is small",
+            explanation="why",
+        )
+    ]
+    summary, warnings = build_client_summary(findings, "MSA", "source text")
+
+    # All four narrative fields fall back to a non-empty placeholder.
+    assert summary.what_this_contract_is.strip() != ""
+    assert summary.what_youre_committing_to.strip() != ""
+    assert summary.recommendation.strip() != ""
+    assert isinstance(summary.biggest_risks, tuple)
+
+    # Constitution IV invariant survives the upstream-error path.
+    assert summary.disclaimer == DISCLAIMER_TEXT
+
+    # Constitution VI: the warning is verbatim and names the upstream
+    # status code, the elapsed seconds, and the "findings still valid"
+    # signal.
+    assert len(warnings) == 1
+    msg = warnings[0]
+    assert "HTTP 500" in msg
+    assert "58.3" in msg
+    assert "findings" in msg.lower()
+    assert "valid" in msg.lower()

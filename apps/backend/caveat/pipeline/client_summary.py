@@ -159,6 +159,28 @@ def build_client_summary(
             ),
             tuple(warnings),
         )
+    except ollama_client.OllamaServerError as exc:
+        # Sprint 2 fixup-4: parallel to the timeout path, but for the
+        # llama runner crash case (HTTP 500 from /api/generate while the
+        # daemon stays up). Same fallback memo shape, same canonical
+        # disclaimer (Constitution IV is invariant), same "findings still
+        # valid" signal. The warning names the upstream status and the
+        # elapsed seconds so the lawyer sees exactly what failed.
+        warnings.append(
+            f"Client summary: Ollama returned HTTP {exc.status_code} "
+            f"after {exc.elapsed_seconds:.1f}s. The model runner may "
+            "have crashed mid-inference (most common with E4B on long "
+            "contracts). Findings (if any) are still valid."
+        )
+        return (
+            ClientSummary(
+                what_this_contract_is=_TOTAL_FALLBACK,
+                what_youre_committing_to=_TOTAL_FALLBACK,
+                biggest_risks=(),
+                recommendation=_TOTAL_FALLBACK,
+            ),
+            tuple(warnings),
+        )
 
     summary = ClientSummary(
         what_this_contract_is=_coerce_text(payload.get("what_this_contract_is")),

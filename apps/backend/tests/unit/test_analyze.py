@@ -476,3 +476,83 @@ def test_analyze_handles_timeout_on_retry(
     assert "retried" in joined or "stricter" in joined
     assert "on retry" in joined
     assert "210.0" in " ".join(result.warnings)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2 fixup-4 — Constitution VI: an upstream Ollama HTTP error (e.g.
+# HTTP 500 when the llama runner subprocess crashes mid-inference) must
+# surface as a structured warning, not as opaque HTTP 500 with stack
+# trace. fixup-3 closed the parallel timeout gap; this closes the
+# OllamaServerError gap.
+# ---------------------------------------------------------------------------
+
+
+def test_analyze_handles_server_error_first_pass(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """Upstream HTTP 500 on first analyze call → empty findings + warning.
+
+    The warning must name the actual upstream status code (so the lawyer
+    sees what really failed) and the elapsed seconds (so the wait the
+    user endured is honest, not summarized away).
+    """
+
+    def _raise(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        raise ollama_client.OllamaServerError(
+            status_code=500,
+            body_snippet='{"error":"llama runner terminated: exit status 2"}',
+            elapsed_seconds=212.4,
+        )
+
+    monkeypatch.setattr(ollama_client, "generate_json", _raise)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    assert len(result.warnings) == 1
+    warning = result.warnings[0]
+    # The verbatim user-facing copy: name the status code, the elapsed
+    # seconds, and suggest the production-class fallback model.
+    assert "HTTP 500" in warning
+    assert "212.4" in warning
+    assert "gemma4:31b-instruct-q4_K_M" in warning
+    # The diagnostic context — "model runner may have crashed
+    # mid-inference" — is what tells the lawyer this isn't a bug in
+    # Caveat AI but in the underlying inference daemon.
+    assert "crashed" in warning.lower() or "runner" in warning.lower()
+
+
+def test_analyze_handles_server_error_on_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """First pass triggers retry; retry crashes upstream → 2 warnings."""
+    first_payload = {
+        "findings": [_make_finding_dict(_QUOTE_BAD, title=f"bad-{i}") for i in range(4)]
+    }
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        if "CRITICAL" in _prompt:
+            raise ollama_client.OllamaServerError(
+                status_code=500,
+                body_snippet="runner crash",
+                elapsed_seconds=68.2,
+            )
+        return first_payload
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    # Two warnings: the retry-was-triggered note + the server-error-on-
+    # retry note.
+    assert len(result.warnings) == 2
+    joined = " ".join(result.warnings).lower()
+    assert "retried" in joined or "stricter" in joined
+    assert "on retry" in joined
+    assert "http 500" in joined
+    assert "68.2" in " ".join(result.warnings)

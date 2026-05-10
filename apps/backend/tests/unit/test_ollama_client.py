@@ -27,6 +27,7 @@ from caveat.llm.ollama_client import (
     OLLAMA_BASE_URL,
     OllamaError,
     OllamaInvalidJSONError,
+    OllamaServerError,
     OllamaTimeoutError,
     OllamaUnreachableError,
     generate,
@@ -35,11 +36,34 @@ from caveat.llm.ollama_client import (
 
 
 class _FakeResponse:
-    """Stand-in for ``httpx.Response`` that captures status + body."""
+    """Stand-in for ``httpx.Response`` that captures status + body.
 
-    def __init__(self, json_body: dict[str, Any], status_code: int = 200) -> None:
-        self._json = json_body
+    Sprint 2 fixup-4: the client now reads ``response.text`` on the
+    HTTPStatusError path so the body snippet can land on
+    :class:`OllamaServerError`. The ``text`` attribute defaults to the
+    serialized JSON body for happy-path tests; tests that simulate an
+    upstream error (e.g. an Ollama 500 with a Go panic trace in the body)
+    pass a string directly via the ``text`` argument.
+    """
+
+    def __init__(
+        self,
+        json_body: dict[str, Any] | None = None,
+        status_code: int = 200,
+        *,
+        text: str | None = None,
+    ) -> None:
+        self._json = json_body if json_body is not None else {}
         self.status_code = status_code
+        # Default ``text`` to a JSON serialization so happy-path tests
+        # don't have to set it. Callers that want to emulate an Ollama
+        # error body (Go panic trace, llama runner stderr, etc.) override.
+        if text is not None:
+            self.text = text
+        else:
+            import json as _json
+
+            self.text = _json.dumps(self._json)
 
     def json(self) -> dict[str, Any]:
         return self._json
@@ -386,3 +410,108 @@ def test_debug_logging_emits_json_parse_error_context(
     assert "JSON parse error" in captured.err
     # The context substring includes characters from around the parse point.
     assert "findings" in captured.err or "severity" in captured.err
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2 fixup-4 — Constitution VI: upstream Ollama HTTP errors must
+# surface as a typed ``OllamaServerError`` (carrying status_code, body
+# snippet, and elapsed_seconds), not as a bare ``httpx.HTTPStatusError``
+# that the router would render as HTTP 500 with a stack trace.
+#
+# The real-world repro: ``gemma4:e4b`` on M4 Air, mid-inference on a long
+# contract, the llama runner subprocess crashed (``exit status 2`` —
+# segfault). The Ollama daemon stayed up but returned HTTP 500 from
+# ``/api/generate``. fixup-3 closed the ReadTimeout gap; this closes the
+# parallel HTTPStatusError gap.
+# ---------------------------------------------------------------------------
+
+
+def test_generate_raises_typed_server_error_on_http_500() -> None:
+    """Ollama HTTP 500 → OllamaServerError carrying status + snippet + elapsed.
+
+    The real-world body on the M4 Air repro was Go panic-style text
+    naming ``llama runner terminated`` and ``exit status 2``. We pass a
+    realistic snippet here so the test asserts the body is preserved
+    (truncated to the configured cap) on the exception.
+    """
+    realistic_body = (
+        '{"error":"llama runner process has terminated: exit status 2"}'
+    )
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse(
+        {}, status_code=500, text=realistic_body
+    )
+
+    with pytest.raises(OllamaServerError) as excinfo:
+        generate("x")
+
+    assert isinstance(excinfo.value, OllamaError)
+    assert excinfo.value.status_code == 500
+    # The body snippet is preserved on the exception so a future log line
+    # or warning footer can surface the actual upstream message.
+    assert "llama runner" in excinfo.value.body_snippet
+    assert "exit status 2" in excinfo.value.body_snippet
+    # Elapsed seconds must be present and non-negative; the fake client
+    # returns instantly so we just pin the contract.
+    assert excinfo.value.elapsed_seconds >= 0.0
+    # The exception message must name the status code and the elapsed
+    # seconds — the FastAPI 502 detail field renders this verbatim.
+    msg = str(excinfo.value)
+    assert "500" in msg
+    assert "crashed" in msg.lower() or "runner" in msg.lower()
+
+
+def test_generate_raises_typed_server_error_on_http_503() -> None:
+    """Any non-2xx status maps to OllamaServerError, not just 500.
+
+    Pin that the wrapper is generic over upstream status. The router
+    can then map all of them to 502 (Bad Gateway) regardless of what the
+    daemon returned, while the warning copy reports the actual upstream
+    status.
+    """
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse(
+        {}, status_code=503, text="service overloaded"
+    )
+
+    with pytest.raises(OllamaServerError) as excinfo:
+        generate("x")
+
+    assert excinfo.value.status_code == 503
+    assert "service overloaded" in excinfo.value.body_snippet
+
+
+def test_ollama_server_error_truncates_long_body_snippet() -> None:
+    """Body snippets longer than the cap are truncated at the boundary.
+
+    The cap is 500 chars; Ollama panic traces can be 10K+ chars and we
+    don't want the whole thing carried around the warning channel or
+    landed in a FastAPI ``detail`` field.
+    """
+    long_body = "X" * 10_000
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse(
+        {}, status_code=500, text=long_body
+    )
+
+    with pytest.raises(OllamaServerError) as excinfo:
+        generate("x")
+
+    # The snippet is bounded by the class-level cap (500) — pin the
+    # invariant rather than the exact number so the cap can move.
+    assert len(excinfo.value.body_snippet) <= 500
+    # ...and what survives is the prefix (so the most relevant first
+    # line of a panic trace lands on the exception).
+    assert excinfo.value.body_snippet.startswith("X")
+
+
+def test_generate_json_propagates_typed_server_error() -> None:
+    """generate_json must surface OllamaServerError unchanged.
+
+    The pipeline only ever calls ``generate_json``; if the wrapper
+    swallowed the typed exception we'd be back to bare HTTP 500 in the
+    router. Pin that the typed variant survives the JSON layer.
+    """
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse(
+        {}, status_code=500, text='{"error":"runtime crash"}'
+    )
+
+    with pytest.raises(OllamaServerError):
+        generate_json("prompt")

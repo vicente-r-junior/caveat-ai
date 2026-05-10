@@ -219,6 +219,25 @@ def analyze(
                 "hardware, or shorten the contract.",
             ),
         )
+    except ollama_client.OllamaServerError as exc:
+        # Sprint 2 fixup-4: parallel to fixup-3 but for upstream HTTP
+        # errors (typically HTTP 500 when the llama runner subprocess
+        # crashes mid-inference — exit status 2 / segfault — most common
+        # with gemma4:e4b on long-context contracts). Pre-fixup this
+        # bubbled as opaque HTTP 500 with stack trace from the router.
+        # Capture, surface a verbatim warning naming the upstream status
+        # and elapsed seconds, and let the summary stage still run so
+        # any disclaimer-bearing fallback memo can reach the lawyer.
+        return AnalysisResult(
+            findings=(),
+            warnings=(
+                f"Analyze stage: Ollama returned HTTP {exc.status_code} "
+                f"after {exc.elapsed_seconds:.1f}s. The model runner may "
+                "have crashed mid-inference, which is most common with "
+                "E4B on long-context contracts. Consider using "
+                "gemma4:31b-instruct-q4_K_M on capable hardware.",
+            ),
+        )
 
     first_coerce = _coerce_findings(first_payload)
 
@@ -262,6 +281,18 @@ def analyze(
             "on retry. Model may be overwhelmed by long context. Try "
             "gemma4:31b-instruct-q4_K_M on capable hardware, or shorten the "
             "contract."
+        )
+        return AnalysisResult(findings=(), warnings=tuple(warnings))
+    except ollama_client.OllamaServerError as exc:
+        # Sprint 2 fixup-4 retry path. Same shape as the first-pass
+        # OllamaServerError handler, but mention "on retry" so the
+        # lawyer can see that the second pass is what crashed.
+        warnings.append(
+            f"Analyze stage: Ollama returned HTTP {exc.status_code} "
+            f"after {exc.elapsed_seconds:.1f}s on retry. The model runner "
+            "may have crashed mid-inference, which is most common with "
+            "E4B on long-context contracts. Consider using "
+            "gemma4:31b-instruct-q4_K_M on capable hardware."
         )
         return AnalysisResult(findings=(), warnings=tuple(warnings))
 

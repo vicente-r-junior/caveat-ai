@@ -37,6 +37,7 @@ from pydantic import BaseModel
 
 from caveat.llm.ollama_client import (
     OllamaError,
+    OllamaServerError,
     OllamaTimeoutError,
     OllamaUnreachableError,
 )
@@ -161,6 +162,18 @@ def analyze_document(document_id: str) -> AnalyzeResponse:
         # service we depend on did not respond in time".
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=str(exc),
+        ) from exc
+    except OllamaServerError as exc:
+        # Belt-and-suspenders. Sprint 2 fixup-4: pipeline stages absorb
+        # OllamaServerError into a structured warning, so the router
+        # should NEVER see this in normal operation. If it does — e.g. a
+        # future pipeline stage forgets to wrap its Ollama call — surface
+        # 502 Bad Gateway, which is the semantically correct status for
+        # "upstream service we depend on returned an error response".
+        # Never HTTP 500 with stack trace (Constitution VI).
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail=str(exc),
         ) from exc
     except OllamaError as exc:
