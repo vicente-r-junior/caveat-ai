@@ -218,3 +218,57 @@ def test_client_summary_warning_lists_only_offending_fields(
     assert "what_youre_committing_to" in msg
     assert "recommendation" in msg
     assert "what_this_contract_is" not in msg
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2 fixup-3 — Constitution VI: Ollama timeouts during the summary
+# stage must surface as structured warnings + fallback memo + disclaimer,
+# not as HTTP 500 from the router.
+# ---------------------------------------------------------------------------
+
+
+def test_client_summary_handles_timeout_with_disclaimer_and_warning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A timeout during summary → fallback memo + disclaimer + verbatim warning.
+
+    The summary stage is the longest in the pipeline (~150-200s on E4B
+    on long-context fixtures). Pre-fixup-3 a timeout escaped the
+    pipeline as HTTP 500 with stack trace; now it surfaces as a
+    Constitution-IV-compliant fallback memo with the canonical
+    disclaimer attached AND a warning that names the elapsed seconds.
+    Findings produced upstream remain valid — the warning copy says so.
+    """
+    _patch_raises(
+        monkeypatch,
+        ollama_client.OllamaTimeoutError(elapsed_seconds=205.7, timeout_kind="read"),
+    )
+
+    findings = [
+        Finding(
+            severity="high",
+            title="cap",
+            quote="Provider's cap is small",
+            explanation="why",
+        )
+    ]
+    summary, warnings = build_client_summary(findings, "MSA", "source text")
+
+    # All four narrative fields fall back to a non-empty placeholder.
+    assert summary.what_this_contract_is.strip() != ""
+    assert summary.what_youre_committing_to.strip() != ""
+    assert summary.recommendation.strip() != ""
+    assert isinstance(summary.biggest_risks, tuple)
+
+    # Constitution IV invariant survives the timeout path.
+    assert summary.disclaimer == DISCLAIMER_TEXT
+
+    # Constitution VI: the warning is verbatim and names the wait.
+    assert len(warnings) == 1
+    msg = warnings[0]
+    assert "timed out" in msg.lower()
+    assert "205.7" in msg
+    # The "Findings (if any) are still valid." copy is the honest signal
+    # that upstream analyze work was not wasted.
+    assert "findings" in msg.lower()
+    assert "valid" in msg.lower()

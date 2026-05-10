@@ -35,7 +35,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from caveat.llm.ollama_client import OllamaError, OllamaUnreachableError
+from caveat.llm.ollama_client import (
+    OllamaError,
+    OllamaTimeoutError,
+    OllamaUnreachableError,
+)
 from caveat.pipeline.analyze import analyze
 from caveat.pipeline.classify import classify
 from caveat.pipeline.client_summary import build_client_summary
@@ -143,6 +147,20 @@ def analyze_document(document_id: str) -> AnalyzeResponse:
         # a "Is Ollama running?" hint instead of a generic 5xx (Constitution VI).
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except OllamaTimeoutError as exc:
+        # Belt-and-suspenders. Sprint 2 fixup-3: pipeline stages
+        # (analyze.py, client_summary.py) catch OllamaTimeoutError and
+        # convert it to a structured warning, so the router should
+        # NEVER see this in normal operation. If it does — e.g. a future
+        # pipeline stage forgets to wrap its Ollama call — surface 504
+        # Gateway Timeout with a structured detail message rather than
+        # letting it escape as HTTP 500 with a stack trace (Constitution
+        # VI). 504 is the semantically correct status for "upstream
+        # service we depend on did not respond in time".
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail=str(exc),
         ) from exc
     except OllamaError as exc:

@@ -133,6 +133,32 @@ def build_client_summary(
             ),
             tuple(warnings),
         )
+    except ollama_client.OllamaTimeoutError as exc:
+        # Sprint 2 fixup-3: the summary stage is the longest in the
+        # pipeline (cold-start + long-context narrative generation can
+        # exceed 200s on E4B). Pre-fixup, this exception bubbled to the
+        # router as HTTP 500 with stack trace, violating Constitution VI.
+        # Now we surface it as a verbatim warning, attach the canonical
+        # disclaimer to the fallback memo (Constitution IV is invariant),
+        # and let the analyze findings (if any survived) reach the
+        # lawyer. The "Findings (if any) are still valid." line is the
+        # honest signal that the summary failed but the upstream work
+        # was not wasted.
+        warnings.append(
+            f"Client summary: Ollama timed out after "
+            f"{exc.elapsed_seconds:.1f}s. The summary stage is the longest "
+            "in the pipeline; cold-start or overwhelmed model can exceed "
+            "timeout. Findings (if any) are still valid."
+        )
+        return (
+            ClientSummary(
+                what_this_contract_is=_TOTAL_FALLBACK,
+                what_youre_committing_to=_TOTAL_FALLBACK,
+                biggest_risks=(),
+                recommendation=_TOTAL_FALLBACK,
+            ),
+            tuple(warnings),
+        )
 
     summary = ClientSummary(
         what_this_contract_is=_coerce_text(payload.get("what_this_contract_is")),

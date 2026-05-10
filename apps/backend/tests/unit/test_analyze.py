@@ -406,3 +406,73 @@ def test_analyze_warns_when_retry_returns_structural_empty(
     joined = " ".join(result.warnings).lower()
     assert "retried" in joined or "stricter" in joined
     assert "on retry" in joined
+
+
+# ---------------------------------------------------------------------------
+# Sprint 2 fixup-3 — Constitution VI: Ollama timeouts must surface as
+# structured warnings, not as opaque HTTP 500 with stack trace. The fixup-2
+# work covered OllamaInvalidJSONError but not OllamaTimeoutError; the manual
+# repro on msa-acme.pdf with E4B caught the gap.
+# ---------------------------------------------------------------------------
+
+
+def test_analyze_handles_timeout_first_pass(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """A timeout during the first analyze call → empty findings + warning.
+
+    The warning must name the actual elapsed seconds so the lawyer sees
+    the real wait, not a generic "timed out" message.
+    """
+
+    def _raise(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        raise ollama_client.OllamaTimeoutError(
+            elapsed_seconds=312.4, timeout_kind="read"
+        )
+
+    monkeypatch.setattr(ollama_client, "generate_json", _raise)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    assert len(result.warnings) == 1
+    warning = result.warnings[0]
+    # The verbatim user-facing copy: name the elapsed seconds, suggest
+    # the production-class fallback model, and mention shortening the
+    # contract.
+    assert "timed out" in warning.lower()
+    assert "312.4" in warning
+    assert "gemma4:31b-instruct-q4_K_M" in warning
+    assert "shorten" in warning.lower() or "long context" in warning.lower()
+
+
+def test_analyze_handles_timeout_on_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """First pass triggers retry; retry times out → empty findings + warning."""
+    first_payload = {
+        "findings": [_make_finding_dict(_QUOTE_BAD, title=f"bad-{i}") for i in range(4)]
+    }
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        if "CRITICAL" in _prompt:
+            raise ollama_client.OllamaTimeoutError(
+                elapsed_seconds=210.0, timeout_kind="read"
+            )
+        return first_payload
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    # Two warnings: the retry-was-triggered note + the timeout-on-retry note.
+    assert len(result.warnings) == 2
+    joined = " ".join(result.warnings).lower()
+    assert "retried" in joined or "stricter" in joined
+    assert "on retry" in joined
+    assert "210.0" in " ".join(result.warnings)

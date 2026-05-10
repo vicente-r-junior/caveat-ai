@@ -202,6 +202,23 @@ def analyze(
             findings=(),
             warnings=("Model returned malformed JSON; no findings produced.",),
         )
+    except ollama_client.OllamaTimeoutError as exc:
+        # Sprint 2 fixup-3: a httpx ReadTimeout used to bubble out as an
+        # opaque HTTP 500 with stack trace from the router (Constitution VI
+        # violation — the same failure mode Sprint 1 fixup-2 closed for
+        # OllamaInvalidJSONError but missed for timeouts). Capture it
+        # here, return empty findings + a warning that names the actual
+        # elapsed seconds, and let the rest of the pipeline (including
+        # the summary stage) continue.
+        return AnalysisResult(
+            findings=(),
+            warnings=(
+                f"Analyze stage: Ollama timed out after "
+                f"{exc.elapsed_seconds:.1f}s. Model may be overwhelmed by "
+                "long context. Try gemma4:31b-instruct-q4_K_M on capable "
+                "hardware, or shorten the contract.",
+            ),
+        )
 
     first_coerce = _coerce_findings(first_payload)
 
@@ -234,6 +251,18 @@ def analyze(
         second_payload = ollama_client.generate_json(stricter_prompt)
     except ollama_client.OllamaInvalidJSONError:
         warnings.append("Model returned malformed JSON on retry; no findings produced.")
+        return AnalysisResult(findings=(), warnings=tuple(warnings))
+    except ollama_client.OllamaTimeoutError as exc:
+        # Same shape as the first-pass timeout, but mention "on retry" so
+        # the lawyer sees that the slow call was the second one. The
+        # initial findings (validated, but below the retry threshold) are
+        # already lost at this point.
+        warnings.append(
+            f"Analyze stage: Ollama timed out after {exc.elapsed_seconds:.1f}s "
+            "on retry. Model may be overwhelmed by long context. Try "
+            "gemma4:31b-instruct-q4_K_M on capable hardware, or shorten the "
+            "contract."
+        )
         return AnalysisResult(findings=(), warnings=tuple(warnings))
 
     second_coerce = _coerce_findings(second_payload)

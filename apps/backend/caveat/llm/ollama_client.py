@@ -9,15 +9,16 @@ trivially auditable.
 
 Per Constitution VI (Honesty over polish), parsing failures surface as
 explicit exceptions (:class:`OllamaInvalidJSONError`,
-:class:`OllamaUnreachableError`) rather than empty defaults. Callers are
-expected to handle them — silent retries are the caller's decision, not
-this module's.
+:class:`OllamaUnreachableError`, :class:`OllamaTimeoutError`) rather than
+empty defaults. Callers are expected to handle them — silent retries are
+the caller's decision, not this module's.
 """
 
 from __future__ import annotations
 
 import json
 import sys
+import time
 from typing import Any
 
 import httpx
@@ -27,20 +28,25 @@ from caveat.config import get_settings
 OLLAMA_BASE_URL = "http://localhost:11434"
 """Hard-coded Ollama URL. Constitution I forbids any other host."""
 
-_DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=300.0, write=10.0, pool=5.0)
+_DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=600.0, write=10.0, pool=5.0)
 """Generous read timeout: per Constitution VII a 30-page contract may take
 ~60s, so we give the pipeline meaningful headroom before declaring the
 daemon hung.
 
-Calibration note: 300s (not 60s) because the *first* analyze call after
-``ollama serve`` starts has to load the model into RAM. On the dev
-hardware (E4B / M4 Air 24GB, ~9.6 GB model) cold-start has been measured
-at >2 minutes wall-clock; warm calls land at 30-90s. The production
-target (gemma4:31b on 32GB+ RAM with GPU) is faster warm but also pays
-a cold-start penalty on first load. We pick the timeout for the worst
-realistic case (cold E4B on a laptop) so a real run never trips httpx
-before the model has even finished loading. Per Constitution VI we'd
-rather wait visibly than fail with an opaque ReadTimeout."""
+Calibration note: 600s (10 minutes) is the **absolute ceiling for dev
+hardware fallback**. Sprint 1 fixup-1 raised this from 120s to 300s for
+analyze cold-start; Sprint 2 fixup-3 raises it again to 600s because the
+*summary* stage on E4B / M4 Air 24GB sustains 150-200s wall-clock and
+runs back-to-back with analyze in the same pipeline — the 300s ceiling
+was tripping on the second call even when the first had used most of
+the headroom. The production target (gemma4:31b-instruct-q4_K_M on
+32GB+ RAM with a capable GPU) is well under 60s per stage, so this
+ceiling is a fallback, not a target.
+
+Per Constitution VI we'd rather wait visibly than fail with an opaque
+ReadTimeout — and when we *do* time out, the pipeline catches
+:class:`OllamaTimeoutError` and surfaces a structured warning rather
+than letting the exception escape as an HTTP 500 with stack trace."""
 
 
 class OllamaError(Exception):
@@ -49,6 +55,30 @@ class OllamaError(Exception):
 
 class OllamaUnreachableError(OllamaError):
     """Raised when the Ollama daemon cannot be contacted on localhost:11434."""
+
+
+class OllamaTimeoutError(OllamaError):
+    """Raised when Ollama exceeds the configured httpx timeout window.
+
+    Wraps :class:`httpx.ReadTimeout`, :class:`httpx.ConnectTimeout`, and
+    :class:`httpx.WriteTimeout` so callers (the pipeline stages) can
+    distinguish a *slow* daemon from a *missing* one
+    (:class:`OllamaUnreachableError`) and from a *malformed* response
+    (:class:`OllamaInvalidJSONError`).
+
+    Carries the elapsed seconds at the moment the timeout fired so the
+    pipeline can build a verbatim warning that names the actual wait the
+    user experienced (Constitution VI: surface, do not paper over).
+    """
+
+    def __init__(self, elapsed_seconds: float, timeout_kind: str) -> None:
+        super().__init__(
+            f"Ollama {timeout_kind} timeout after "
+            f"{elapsed_seconds:.1f}s. The daemon is reachable but the model "
+            "did not produce a response in time."
+        )
+        self.elapsed_seconds: float = elapsed_seconds
+        self.timeout_kind: str = timeout_kind
 
 
 class OllamaInvalidJSONError(OllamaError):
@@ -138,6 +168,10 @@ def generate(
     ------
     OllamaUnreachableError
         If the Ollama daemon is not running on ``localhost:11434``.
+    OllamaTimeoutError
+        If the read/connect/write timeout fires before Ollama responds.
+        Carries the elapsed wall-clock seconds so callers can surface a
+        verbatim warning that names the actual wait the user endured.
     httpx.HTTPStatusError
         If Ollama returns a non-2xx status.
     """
@@ -157,6 +191,9 @@ def generate(
         f"prompt_len={len(prompt)} prompt={_truncate_for_debug(prompt)!r}"
     )
 
+    # Track wall-clock so OllamaTimeoutError can name the actual wait the
+    # user experienced. httpx itself doesn't expose that on the exception.
+    start = time.perf_counter()
     try:
         with httpx.Client(timeout=_DEFAULT_TIMEOUT) as client:
             response = client.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload)
@@ -165,6 +202,15 @@ def generate(
             "Ollama not reachable at http://localhost:11434 — "
             "is `ollama serve` running?"
         ) from exc
+    except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.WriteTimeout) as exc:
+        # Map all three timeout flavours onto a single typed exception.
+        # The pipeline stages (analyze, client_summary) catch this and
+        # convert it into a structured warning per Constitution VI; the
+        # router has a defensive fallback that returns 504 (never 500) if
+        # somehow it slips past the pipeline.
+        elapsed = time.perf_counter() - start
+        kind = type(exc).__name__.removesuffix("Timeout").lower() or "read"
+        raise OllamaTimeoutError(elapsed_seconds=elapsed, timeout_kind=kind) from exc
 
     response.raise_for_status()
     body: dict[str, Any] = response.json()

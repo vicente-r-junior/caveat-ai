@@ -7,6 +7,40 @@
 
 ---
 
+## Fixup-3 addendum (2026-05-10) — Ollama timeouts surface as warnings (Constitution VI)
+
+The first manual run on `fixtures/contracts/msa-acme.pdf` with `gemma4:e4b` on M4 Air tripped an `httpx.ReadTimeout` during the **summary** stage (analyze had used ~150s of the previous 300s ceiling, leaving summary too little headroom). Pre-fixup, this surfaced as **HTTP 500 with stack trace** from the router — exactly the failure mode Sprint 1 fixup-2 was supposed to prevent. fixup-2 only handled `OllamaInvalidJSONError`; `httpx.ReadTimeout` was the gap.
+
+**What changed in this fixup (surgical, scope-bounded):**
+
+- `apps/backend/caveat/llm/ollama_client.py`:
+  - New typed exception `OllamaTimeoutError(OllamaError)` carrying `elapsed_seconds` + `timeout_kind` (`"read"`, `"connect"`, `"write"`).
+  - `generate()` wraps `httpx.ReadTimeout`, `httpx.ConnectTimeout`, and `httpx.WriteTimeout` and re-raises the typed variant. Wall-clock is measured via `time.perf_counter()` so the warning names the actual wait the user endured.
+  - Default `httpx` read timeout raised from **300s → 600s**. This is the absolute ceiling for dev hardware fallback (E4B on M4 Air): analyze + summary on long-context fixtures can each sustain 150-200s, and 300s gave summary essentially no headroom. Production target (`gemma4:31b-instruct-q4_K_M` on capable hardware) is well under 60s per stage.
+- `apps/backend/caveat/pipeline/analyze.py`: catches `OllamaTimeoutError` on both first pass and retry. Returns empty findings + a verbatim warning naming the elapsed seconds and suggesting `gemma4:31b-instruct-q4_K_M` on capable hardware.
+- `apps/backend/caveat/pipeline/client_summary.py`: catches `OllamaTimeoutError`. Returns the four-field fallback memo (with the canonical disclaimer still attached — Constitution IV is invariant) and a warning that names the elapsed seconds and notes "Findings (if any) are still valid."
+- `apps/backend/caveat/routers/analyze.py`: belt-and-suspenders `except OllamaTimeoutError` → HTTP **504 Gateway Timeout** with structured detail, in case a future pipeline stage forgets to wrap its Ollama call. Should never trigger in normal operation because the pipeline now absorbs the timeout into a warning.
+- `apps/backend/tests/unit/test_ollama_client.py`: timeout-pin test updated to 600s; three new tests pin that `httpx.ReadTimeout` / `ConnectTimeout` / `WriteTimeout` map to `OllamaTimeoutError` with the correct `timeout_kind` and elapsed seconds; one test pins that `generate_json` propagates the typed exception unchanged.
+- `apps/backend/tests/unit/test_analyze.py`: two new tests pin (a) first-pass timeout → empty findings + verbatim warning naming elapsed seconds; (b) retry timeout → two warnings (retry-was-triggered + timeout-on-retry).
+- `apps/backend/tests/unit/test_client_summary.py`: one new test pins timeout → fallback memo + canonical disclaimer + warning naming elapsed seconds and the "findings still valid" copy.
+
+**Frontend impact**: `Processing.tsx` is unchanged. The hold-pulse contract on the last stage already supports indefinite pulsing (line 132 short-circuits the advance timer when `currentStage >= STAGES.length - 1`); the new 600s server ceiling extends the realistic wait but does not change the UI contract. There is no client-side fetch timeout (carry-forward note 7).
+
+**Manual scenarios affected**:
+
+- **Scenario 3** (Processing screen during real analyze): on E4B hardware, the last stage may now pulse for up to ~10 minutes before resolving. This is the constitutionally-correct behavior — the UI never lies about a stage finishing. If the analyze does time out, the lawyer lands on Findings with a warnings banner naming the elapsed seconds.
+- **Scenario 8** (the honest empty state): on E4B with cold-start or very long contracts, the warnings banner may now show `"Analyze stage: Ollama timed out after 312.4s. Model may be overwhelmed by long context. Try gemma4:31b-instruct-q4_K_M on capable hardware, or shorten the contract."` and/or `"Client summary: Ollama timed out after 205.7s. The summary stage is the longest in the pipeline; cold-start or overwhelmed model can exceed timeout. Findings (if any) are still valid."` These are **expected outputs** under the new behavior, not regressions. The constitutional negatives still hold: nowhere on the page should the words "no risks" or "you're safe" appear.
+
+The **public API shape of `POST /api/analyze/{id}` is unchanged**: timeouts on the pipeline stages still produce a normal `AnalyzeResponse` with `warnings[]` populated; only the previously-impossible "uncaught timeout" path now returns 504 instead of 500. The citation validator and the no-network test guard were not touched.
+
+**Test counts after fixup-3**:
+- Backend unit: **84** tests (was 77), ~1.09s
+- Backend E2E: 13 tests (unchanged)
+- Frontend unit: 52 tests (unchanged)
+- Frontend E2E: 2 tests (unchanged)
+
+---
+
 ## Summary of what changed
 
 Sprint 2 delivered the full frontend vertical slice for User Story 1 — a lawyer can drop a contract PDF into the browser, watch a real-time pipeline screen, and land on a Findings tab where every model claim is flanked by its source quote in burgundy. The visual identity from `docs/caveat-prototype-v3.html` is now real: editorial serif titles, the burgundy accent doing all the heavy lifting, status pills in mono uppercase, no SaaS gradients, no decorative imagery. The disclaimer is rendered at the App shell level so it appears on every screen with AI output (Constitution IV). Warnings from the analyze pipeline (the e4b structural-empty case from sprint-1 fixup-2) surface as a verbatim banner ABOVE the summary cards, never summarized, never truncated (Constitution VI). The Sprint 1 carry-forward Starlette deprecation warnings are gone.

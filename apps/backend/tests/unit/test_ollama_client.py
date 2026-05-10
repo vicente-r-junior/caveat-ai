@@ -25,7 +25,9 @@ from caveat.config import get_settings
 from caveat.llm import ollama_client
 from caveat.llm.ollama_client import (
     OLLAMA_BASE_URL,
+    OllamaError,
     OllamaInvalidJSONError,
+    OllamaTimeoutError,
     OllamaUnreachableError,
     generate,
     generate_json,
@@ -142,6 +144,99 @@ def test_generate_raises_unreachable_on_connect_error(monkeypatch: pytest.Monkey
         generate("x")
 
 
+def _install_raising_client(
+    monkeypatch: pytest.MonkeyPatch, exc_factory: Any
+) -> None:
+    """Install a fake httpx.Client whose ``.post`` raises *exc_factory()*."""
+
+    class _RaisingClient:
+        def __init__(self, *_a: Any, **_k: Any) -> None:
+            pass
+
+        def __enter__(self) -> _RaisingClient:
+            return self
+
+        def __exit__(self, *_exc: Any) -> None:
+            return None
+
+        def post(self, *_a: Any, **_k: Any) -> Any:
+            raise exc_factory()
+
+    monkeypatch.setattr("caveat.llm.ollama_client.httpx.Client", _RaisingClient)
+
+
+def test_generate_raises_typed_timeout_on_read_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """httpx.ReadTimeout becomes OllamaTimeoutError, not bare HTTP 500.
+
+    Sprint 2 fixup-3: a raw httpx.ReadTimeout used to bubble out of the
+    pipeline as HTTP 500 with stack trace (Constitution VI violation).
+    The client now wraps it in :class:`OllamaTimeoutError`, which is a
+    subclass of :class:`OllamaError` — the pipeline stages catch the
+    typed variant and surface a structured warning, while the router has
+    a defensive 504 fallback.
+    """
+    _install_raising_client(monkeypatch, lambda: httpx.ReadTimeout("read timed out"))
+
+    with pytest.raises(OllamaTimeoutError) as excinfo:
+        generate("x")
+
+    assert isinstance(excinfo.value, OllamaError)
+    assert excinfo.value.timeout_kind == "read"
+    # Elapsed seconds must be present and non-negative; a real timeout
+    # would carry the actual wait, but the fake client returns instantly
+    # so we just pin the contract that the field exists and is numeric.
+    assert excinfo.value.elapsed_seconds >= 0.0
+    # The exception message should be self-explanatory enough to land in
+    # the FastAPI 504 detail without further formatting.
+    msg = str(excinfo.value)
+    assert "timeout" in msg.lower()
+
+
+def test_generate_raises_typed_timeout_on_connect_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """httpx.ConnectTimeout maps to OllamaTimeoutError(kind='connect')."""
+    _install_raising_client(
+        monkeypatch, lambda: httpx.ConnectTimeout("connect timed out")
+    )
+
+    with pytest.raises(OllamaTimeoutError) as excinfo:
+        generate("x")
+
+    assert excinfo.value.timeout_kind == "connect"
+
+
+def test_generate_raises_typed_timeout_on_write_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """httpx.WriteTimeout maps to OllamaTimeoutError(kind='write')."""
+    _install_raising_client(
+        monkeypatch, lambda: httpx.WriteTimeout("write timed out")
+    )
+
+    with pytest.raises(OllamaTimeoutError) as excinfo:
+        generate("x")
+
+    assert excinfo.value.timeout_kind == "write"
+
+
+def test_generate_json_propagates_typed_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """generate_json must surface OllamaTimeoutError unchanged.
+
+    The pipeline only ever calls ``generate_json``; if the wrapper
+    swallowed the typed exception we'd be back to bare HTTP 500 in the
+    router. Pin that the typed variant survives the JSON layer.
+    """
+    _install_raising_client(monkeypatch, lambda: httpx.ReadTimeout("slow"))
+
+    with pytest.raises(OllamaTimeoutError):
+        generate_json("prompt")
+
+
 def test_generate_json_uses_format_json() -> None:
     _FakeClient.response_factory = lambda _url, _json: _FakeResponse(
         {"response": '{"key": "value"}'}
@@ -184,17 +279,22 @@ def test_generate_json_rejects_non_object() -> None:
 
 
 def test_default_read_timeout_calibrated_for_e4b_cold_start() -> None:
-    """The httpx read timeout must be 300s, not 120s.
+    """The httpx read timeout must be 600s — the dev-hardware ceiling.
 
-    Calibrated for E4B (~9.6 GB) cold-start on dev hardware: the *first*
-    analyze call after ``ollama serve`` starts has been measured >2
-    minutes wall-clock on M4 Air while the model loads into RAM. Sprint 1
-    manual validation tripped a 120s timeout on this exact path. Pin the
-    value here so a future "looks too long, let me lower it" tweak fails
-    a test instead of the demo.
+    Sprint 1 fixup-1 raised this from 120s to 300s after the analyze
+    cold-start tripped at 120s. Sprint 2 fixup-3 raises it again to 600s
+    because the *summary* stage (the longest in the pipeline) tripped the
+    300s ceiling on E4B / M4 Air on the msa-acme.pdf fixture: analyze
+    consumed ~150s and summary then sustained another 150-200s in the
+    same pipeline run, so 300s gave summary essentially no headroom.
+
+    600s is the **absolute ceiling for dev hardware fallback**, not a
+    target. The production model (gemma4:31b on capable hardware) is
+    well under 60s per stage. Pin the value here so a future "looks too
+    long, let me lower it" tweak fails a test instead of the demo.
     """
     timeout = ollama_client._DEFAULT_TIMEOUT
-    assert timeout.read == 300.0, f"expected read timeout 300s, got {timeout.read}"
+    assert timeout.read == 600.0, f"expected read timeout 600s, got {timeout.read}"
 
 
 # ---------------------------------------------------------------------------
