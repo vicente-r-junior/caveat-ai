@@ -17,6 +17,15 @@ Per Constitution I, all network I/O is funnelled through
 output is surfaced as a fallback memo with the disclaimer still attached
 — the lawyer sees that the summary failed; we do not pretend it
 succeeded.
+
+Sprint 1 fixup-2: :func:`build_client_summary` now returns
+``(ClientSummary, tuple[str, ...])`` instead of just ``ClientSummary``.
+The original shape silently produced fallback prose for missing or
+malformed fields with no signal to the caller, which violated
+Constitution VI (the lawyer saw "(Not available...)" placeholders in the
+response with no warning explaining why). The router merges the returned
+warnings into the API response so the channel matches
+:class:`caveat.pipeline.analyze.AnalysisResult`.
 """
 
 from __future__ import annotations
@@ -84,31 +93,74 @@ def build_client_summary(
     findings: Iterable[Finding],
     contract_type: str,
     source_text: str,
-) -> ClientSummary:
+) -> tuple[ClientSummary, tuple[str, ...]]:
     """Generate the client-facing memo for *contract_type* given *findings*.
+
+    Returns ``(summary, warnings)`` where *warnings* is a tuple of strings
+    that the router merges into :class:`caveat.routers.analyze.AnalyzeResponse`.
+    The shape mirrors :class:`caveat.pipeline.analyze.AnalysisResult` for
+    consistency.
 
     The findings are converted to plain dicts for the prompt (the model
     receives the same shape regardless of the dataclass implementation
     behind it). The disclaimer is attached unconditionally — even on
     malformed-JSON failure paths — because that is the constitutional
     invariant.
+
+    Constitution VI fixup-2: emit a warning when the model returned
+    malformed JSON (so the user sees why the four fields are placeholders)
+    AND when individual fields fell back silently (so the user knows
+    *which* field the model omitted).
     """
     findings_dicts = [asdict(f) for f in findings]
     prompt = build_client_summary_prompt(findings_dicts, contract_type, source_text)
+    warnings: list[str] = []
 
     try:
         payload = ollama_client.generate_json(prompt)
     except ollama_client.OllamaInvalidJSONError:
-        return ClientSummary(
-            what_this_contract_is=_TOTAL_FALLBACK,
-            what_youre_committing_to=_TOTAL_FALLBACK,
-            biggest_risks=(),
-            recommendation=_TOTAL_FALLBACK,
+        warnings.append(
+            "Client summary: model returned malformed JSON. All four "
+            "narrative fields are placeholders; rerun the analysis or "
+            "fall back to attorney drafting."
+        )
+        return (
+            ClientSummary(
+                what_this_contract_is=_TOTAL_FALLBACK,
+                what_youre_committing_to=_TOTAL_FALLBACK,
+                biggest_risks=(),
+                recommendation=_TOTAL_FALLBACK,
+            ),
+            tuple(warnings),
         )
 
-    return ClientSummary(
+    summary = ClientSummary(
         what_this_contract_is=_coerce_text(payload.get("what_this_contract_is")),
         what_youre_committing_to=_coerce_text(payload.get("what_youre_committing_to")),
         biggest_risks=_coerce_risks(payload.get("biggest_risks")),
         recommendation=_coerce_text(payload.get("recommendation")),
     )
+
+    # Per-field silence: the model parsed but omitted (or emptied) one or
+    # more narrative fields. List the offending field names so the lawyer
+    # can decide whether to rerun (e.g. on the larger model) or accept the
+    # partial summary. ``biggest_risks`` is intentionally excluded — an
+    # empty risks tuple is a legitimate "no material risks" signal per the
+    # ClientSummary docstring, not a fallback.
+    fallback_fields = [
+        name
+        for name, value in (
+            ("what_this_contract_is", summary.what_this_contract_is),
+            ("what_youre_committing_to", summary.what_youre_committing_to),
+            ("recommendation", summary.recommendation),
+        )
+        if value == _FIELD_FALLBACK
+    ]
+    if fallback_fields:
+        warnings.append(
+            "Client summary: model omitted or left empty: "
+            f"{', '.join(fallback_fields)}. Each missing field shows a "
+            "fallback placeholder."
+        )
+
+    return summary, tuple(warnings)

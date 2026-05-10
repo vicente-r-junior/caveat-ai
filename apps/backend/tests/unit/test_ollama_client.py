@@ -195,3 +195,94 @@ def test_default_read_timeout_calibrated_for_e4b_cold_start() -> None:
     """
     timeout = ollama_client._DEFAULT_TIMEOUT
     assert timeout.read == 300.0, f"expected read timeout 300s, got {timeout.read}"
+
+
+# ---------------------------------------------------------------------------
+# Sprint 1 fixup-2 — CAVEAT_DEBUG_LLM diagnostic flag.
+#
+# These tests pin that the debug flag is OFF by default (so test/CI output
+# stays clean) and that flipping it produces visible stderr output with
+# the prompt, the response, and JSON parse errors. The diagnostic surface
+# is what made the silent-empty bug debuggable in the first place; it
+# must keep working.
+# ---------------------------------------------------------------------------
+
+
+def test_debug_logging_silent_by_default(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With CAVEAT_DEBUG_LLM unset, no [caveat.llm.debug] lines hit stderr."""
+    monkeypatch.delenv("CAVEAT_DEBUG_LLM", raising=False)
+    get_settings.cache_clear()
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse({"response": "hi"})
+
+    generate("a unique prompt marker xyz123")
+
+    captured = capsys.readouterr()
+    assert "[caveat.llm.debug]" not in captured.err
+    assert "xyz123" not in captured.err
+
+
+def test_debug_logging_emits_prompt_and_response_when_enabled(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With CAVEAT_DEBUG_LLM=true, both directions are visible on stderr."""
+    monkeypatch.setenv("CAVEAT_DEBUG_LLM", "true")
+    get_settings.cache_clear()
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse(
+        {"response": "model-said-hi-back-MARKER"}
+    )
+
+    generate("prompt-marker-OUT")
+
+    captured = capsys.readouterr()
+    assert "[caveat.llm.debug]" in captured.err
+    assert "prompt-marker-OUT" in captured.err
+    assert "model-said-hi-back-MARKER" in captured.err
+
+
+def test_debug_logging_truncates_long_payloads(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prompts/responses over the 4K cap are truncated; full text is not dumped.
+
+    The analyse prompt for a 30-page contract is ~50K characters; without
+    truncation the debug emitter would flood the terminal on every call
+    and obscure the parse-error context that motivated the flag.
+    """
+    monkeypatch.setenv("CAVEAT_DEBUG_LLM", "true")
+    get_settings.cache_clear()
+
+    long_prompt = "X" * 5000
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse({"response": "ok"})
+
+    generate(long_prompt)
+
+    captured = capsys.readouterr()
+    assert "truncated" in captured.err
+    # Full 5000-char string must not be present verbatim.
+    assert long_prompt not in captured.err
+
+
+def test_debug_logging_emits_json_parse_error_context(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When generate_json hits a JSONDecodeError, the offending substring is logged.
+
+    This is the single most useful piece of information when Gemma drifts
+    from JSON: the bytes immediately around the parse failure point.
+    """
+    monkeypatch.setenv("CAVEAT_DEBUG_LLM", "true")
+    get_settings.cache_clear()
+    _FakeClient.response_factory = lambda _u, _j: _FakeResponse(
+        {"response": '{"findings": [{"severity": "high",}]}'}  # trailing comma → invalid JSON
+    )
+
+    with pytest.raises(OllamaInvalidJSONError):
+        generate_json("any prompt")
+
+    captured = capsys.readouterr()
+    assert "[caveat.llm.debug]" in captured.err
+    assert "JSON parse error" in captured.err
+    # The context substring includes characters from around the parse point.
+    assert "findings" in captured.err or "severity" in captured.err

@@ -90,6 +90,25 @@ startup. Boot takes longer, but the first real analyze is already warm.
 Off by default to keep test/CI startup fast and to avoid blocking on
 Ollama when you're just developing the API.
 
+### Optional: log every Ollama prompt and response (`CAVEAT_DEBUG_LLM`)
+
+When the analysis comes back empty or with unexpected `warnings`, the
+fastest way to find out *why* is to see exactly what Gemma was sent and
+what it returned. Set `CAVEAT_DEBUG_LLM=true` to make the Ollama client
+emit each call to **stderr**, including the outgoing prompt (truncated
+to 4 KB), the raw response, and the offending substring on JSON parse
+errors:
+
+```bash
+CAVEAT_DEBUG_LLM=true just dev 2> /tmp/caveat-llm.log
+# or to see it inline:
+CAVEAT_DEBUG_LLM=true just start
+```
+
+Off by default — these prints are noisy and would clutter test/CI
+output. Use this when investigating why the model produced empty
+findings, the wrong schema, or malformed JSON.
+
 ## Architecture in one diagram
 
 ```

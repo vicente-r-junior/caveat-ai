@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     # default to keep test/CI startup fast (Constitution X budget); turn
     # on for demo/dev runs with `CAVEAT_WARMUP_ON_STARTUP=true`.
     warmup_on_startup: bool = False
+    # Diagnostic: when true, the Ollama client emits the outgoing prompt,
+    # the raw response, and any JSON parse error (with the offending
+    # substring) to stderr. Off by default — these prints are noisy and
+    # would clutter the test/CI output. Use `CAVEAT_DEBUG_LLM=true` when
+    # investigating model behaviour against real Ollama on real fixtures
+    # (see sprint-1-validation.md fixup-2 for the use case that motivated
+    # this flag).
+    debug_llm: bool = False
 
 
 @lru_cache(maxsize=1)

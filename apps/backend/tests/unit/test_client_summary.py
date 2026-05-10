@@ -3,6 +3,12 @@
 The summary stage is where the constitutional disclaimer (Constitution IV)
 is attached. These tests pin that the disclaimer survives every code path —
 happy, partial, and malformed-JSON — because exports downstream rely on it.
+
+Sprint 1 fixup-2: ``build_client_summary`` now returns
+``(ClientSummary, tuple[str, ...])`` so the malformed-JSON and per-field
+fallback paths surface a Constitution VI warning instead of producing
+silent placeholder prose. The existing happy-path tests are updated to
+unpack the tuple, and two new tests pin the warning paths.
 """
 
 from __future__ import annotations
@@ -43,7 +49,7 @@ def test_client_summary_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     }
     _patch(monkeypatch, payload)
 
-    summary = build_client_summary([], "MSA", "source text")
+    summary, warnings = build_client_summary([], "MSA", "source text")
 
     assert isinstance(summary, ClientSummary)
     assert summary.what_this_contract_is == payload["what_this_contract_is"]
@@ -54,15 +60,22 @@ def test_client_summary_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
     assert summary.disclaimer == DISCLAIMER_TEXT
     assert summary.disclaimer.strip() != ""
     assert "AI" in summary.disclaimer or "attorney review" in summary.disclaimer
+    # Happy path emits no warnings.
+    assert warnings == ()
 
 
 def test_client_summary_missing_fields_filled_with_placeholder(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When the model omits fields, each missing field gets a fallback string."""
+    """When the model omits fields, each missing field gets a fallback string.
+
+    Sprint 1 fixup-2: each fallback is now also surfaced as a warning so
+    the lawyer sees *which* fields the model omitted instead of just
+    seeing the placeholder text.
+    """
     _patch(monkeypatch, {"recommendation": "Negotiate the cap."})
 
-    summary = build_client_summary([], "MSA", "source text")
+    summary, warnings = build_client_summary([], "MSA", "source text")
 
     assert summary.recommendation == "Negotiate the cap."
     # The other three fields must each carry a non-empty placeholder so
@@ -73,6 +86,12 @@ def test_client_summary_missing_fields_filled_with_placeholder(
     assert isinstance(summary.biggest_risks, tuple)
     # Disclaimer is still attached.
     assert summary.disclaimer == DISCLAIMER_TEXT
+    # Constitution VI: the missing fields are named in a warning.
+    assert len(warnings) == 1
+    assert "what_this_contract_is" in warnings[0]
+    assert "what_youre_committing_to" in warnings[0]
+    # `recommendation` was provided, so it must NOT appear in the warning.
+    assert "recommendation" not in warnings[0]
 
 
 def test_client_summary_caps_biggest_risks_at_three(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,10 +109,11 @@ def test_client_summary_caps_biggest_risks_at_three(monkeypatch: pytest.MonkeyPa
     }
     _patch(monkeypatch, payload)
 
-    summary = build_client_summary([], "MSA", "src")
+    summary, warnings = build_client_summary([], "MSA", "src")
 
     assert len(summary.biggest_risks) == 3
     assert summary.biggest_risks == ("Risk A", "Risk B", "Risk C")
+    assert warnings == ()
 
 
 def test_client_summary_filters_empty_strings_from_risks(
@@ -107,9 +127,10 @@ def test_client_summary_filters_empty_strings_from_risks(
     }
     _patch(monkeypatch, payload)
 
-    summary = build_client_summary([], "MSA", "src")
+    summary, warnings = build_client_summary([], "MSA", "src")
 
     assert summary.biggest_risks == ("Real risk",)
+    assert warnings == ()
 
 
 def test_client_summary_disclaimer_on_invalid_json(
@@ -132,7 +153,7 @@ def test_client_summary_disclaimer_on_invalid_json(
             explanation="why",
         )
     ]
-    summary = build_client_summary(findings, "MSA", "source text")
+    summary, warnings = build_client_summary(findings, "MSA", "source text")
 
     # All four narrative fields fall back to a non-empty placeholder.
     assert summary.what_this_contract_is.strip() != ""
@@ -142,3 +163,58 @@ def test_client_summary_disclaimer_on_invalid_json(
 
     # The disclaimer field is the canonical constant.
     assert summary.disclaimer == DISCLAIMER_TEXT
+
+    # Sprint 1 fixup-2: malformed JSON now surfaces a warning instead of
+    # silently producing the four placeholder fields.
+    assert len(warnings) == 1
+    assert "malformed" in warnings[0].lower() or "json" in warnings[0].lower()
+
+
+# ---------------------------------------------------------------------------
+# Sprint 1 fixup-2 — additional coverage of the warnings channel.
+# ---------------------------------------------------------------------------
+
+
+def test_client_summary_no_warnings_when_only_risks_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An empty `biggest_risks` is a legitimate signal, not a fallback.
+
+    The ClientSummary docstring says "an empty tuple is acceptable: it
+    means the model could not identify any material risks". Pin that the
+    warnings channel respects this — empty risks alone must NOT produce a
+    warning, only the three narrative fields can.
+    """
+    payload = {
+        "what_this_contract_is": "ok",
+        "what_youre_committing_to": "ok",
+        "biggest_risks": [],
+        "recommendation": "ok",
+    }
+    _patch(monkeypatch, payload)
+
+    summary, warnings = build_client_summary([], "MSA", "src")
+
+    assert summary.biggest_risks == ()
+    assert warnings == ()
+
+
+def test_client_summary_warning_lists_only_offending_fields(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Warning enumerates exactly the fields that fell back, no more."""
+    payload = {
+        "what_this_contract_is": "real prose",
+        # what_youre_committing_to omitted → fallback
+        # recommendation omitted → fallback
+        "biggest_risks": ["one"],
+    }
+    _patch(monkeypatch, payload)
+
+    _, warnings = build_client_summary([], "MSA", "src")
+
+    assert len(warnings) == 1
+    msg = warnings[0]
+    assert "what_youre_committing_to" in msg
+    assert "recommendation" in msg
+    assert "what_this_contract_is" not in msg

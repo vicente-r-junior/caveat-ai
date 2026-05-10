@@ -237,3 +237,172 @@ def test_analyze_skips_malformed_finding_dicts(
 
     assert len(result.findings) == 2
     assert {f.title for f in result.findings} == {"ok-1", "ok-2"}
+
+
+# ---------------------------------------------------------------------------
+# Sprint 1 fixup-2 — Constitution VI: silent-empty paths must surface as
+# warnings, not as ``warnings=()`` with empty findings. The original
+# implementation collapsed three structural failure modes into the same
+# "perfect run" branch; these tests pin that they now produce distinct,
+# diagnosable warnings.
+# ---------------------------------------------------------------------------
+
+
+def test_analyze_warns_when_model_returns_empty_findings_list(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """Model returns valid JSON with `findings: []` → warn, do not retry.
+
+    A legitimate "no concerns" response is indistinguishable from a model
+    that gave up. Constitution VI: surface the ambiguity so the lawyer can
+    verify rather than silently accept zero findings.
+    """
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        return {"findings": []}
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    assert len(result.warnings) == 1
+    warning = result.warnings[0].lower()
+    assert "zero findings" in warning or "no findings" in warning
+    assert "verify" in warning
+
+
+def test_analyze_warns_when_findings_field_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """Model returns valid JSON without a `findings` field at all → warn.
+
+    This is the worst silent failure: the model produced something the
+    JSON parser accepted but that has no usable structure. Pre-fixup-2
+    this returned ``AnalysisResult(findings=(), warnings=())``.
+    """
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        return {"summary": "I am confused about this contract."}
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    assert len(result.warnings) == 1
+    assert "findings" in result.warnings[0].lower()
+    assert "missing" in result.warnings[0].lower() or "no usable" in result.warnings[0].lower()
+
+
+def test_analyze_warns_when_findings_field_wrong_type(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """Model returns `findings: "some string"` (not a list) → warn."""
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        return {"findings": "I could not produce findings"}
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    assert len(result.warnings) == 1
+    assert "findings" in result.warnings[0].lower()
+
+
+def test_analyze_warns_when_all_entries_malformed(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """Model returns N findings but every one fails the required-fields filter.
+
+    The pre-fixup-2 silent path: ``raw_count == 3`` but ``coerce.findings ==
+    ()`` because every entry was malformed. The validator then saw zero
+    inputs, returned ``failure_rate == 0.0``, and the analyse stage
+    returned silently. This must now warn with the raw count so the
+    lawyer can see the model attempted the task and failed.
+    """
+    payload = {
+        "findings": [
+            {"severity": "high", "quote": "x"},  # missing title + explanation
+            {"title": "no sev", "quote": "y"},  # missing severity + explanation
+            "not even a dict",  # wrong type entirely
+        ]
+    }
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        return payload
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    assert len(result.warnings) == 1
+    warning = result.warnings[0].lower()
+    assert "malformed" in warning
+    assert "3" in result.warnings[0]  # the raw count is surfaced
+
+
+def test_analyze_does_not_retry_on_structural_empty(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """Structural failures must NOT trigger a second Ollama call.
+
+    On the E4B fallback model on a laptop, every retry costs minutes. A
+    structural failure is unlikely to flip on a second identical call
+    against the same model + same prompt; surfacing the warning is
+    cheaper and more honest than silently burning compute.
+    """
+    call_count = 0
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        nonlocal call_count
+        call_count += 1
+        return {"findings": []}
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    analyze(msa_text, "MSA", msa_playbook)
+
+    assert call_count == 1, "Structural-empty paths must not retry"
+
+
+def test_analyze_warns_when_retry_returns_structural_empty(
+    monkeypatch: pytest.MonkeyPatch,
+    msa_text: str,
+    msa_playbook: dict[str, Any],
+) -> None:
+    """First pass triggers retry (high failure rate); retry hands back empty."""
+    first_payload = {
+        "findings": [_make_finding_dict(_QUOTE_BAD, title=f"bad-{i}") for i in range(4)]
+    }
+    second_payload: dict[str, Any] = {"findings": []}
+    calls = iter([first_payload, second_payload])
+
+    def _fake(_prompt: str, **_kwargs: Any) -> dict[str, Any]:
+        return next(calls)
+
+    monkeypatch.setattr(ollama_client, "generate_json", _fake)
+
+    result = analyze(msa_text, "MSA", msa_playbook)
+
+    assert result.findings == ()
+    # Two warnings expected: the retry-was-triggered note and the
+    # structural-empty-on-retry note. The latter must say "on retry" so
+    # the human knows the second pass is what failed.
+    assert len(result.warnings) == 2
+    joined = " ".join(result.warnings).lower()
+    assert "retried" in joined or "stricter" in joined
+    assert "on retry" in joined

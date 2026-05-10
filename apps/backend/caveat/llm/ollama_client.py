@@ -17,6 +17,7 @@ this module's.
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any
 
 import httpx
@@ -66,6 +67,37 @@ class OllamaInvalidJSONError(OllamaError):
         self.raw_response: str = raw_response
 
 
+_DEBUG_TRUNCATE_CHARS = 4000
+"""Hard cap on how much prompt/response text the debug emitter will print.
+
+The analyse prompt for a 30-page contract is ~50K characters; dumping the
+whole thing on every call drowns the terminal. 4K is enough to see the
+prompt header, the playbook, the first chunk of contract text, and the
+JSON instructions — i.e. enough to confirm the prompt structure is sane
+without flooding stderr."""
+
+
+def _truncate_for_debug(s: str) -> str:
+    if len(s) <= _DEBUG_TRUNCATE_CHARS:
+        return s
+    return f"{s[:_DEBUG_TRUNCATE_CHARS]}... [truncated {len(s) - _DEBUG_TRUNCATE_CHARS} chars]"
+
+
+def _debug_emit(message: str) -> None:
+    """Print *message* to stderr when ``CAVEAT_DEBUG_LLM`` is enabled.
+
+    Uses ``print(..., file=sys.stderr)`` rather than the ``logging`` module
+    because pytest's ``capsys`` reassigns ``sys.stderr`` per-test; a
+    ``logging.StreamHandler(sys.stderr)`` would have captured the original
+    stream at construction time and silently miss the redirected one. The
+    flag is read each call so flipping ``CAVEAT_DEBUG_LLM`` and clearing
+    the settings cache (in tests) takes effect without reimport.
+    """
+    if not get_settings().debug_llm:
+        return
+    print(f"[caveat.llm.debug] {message}", file=sys.stderr, flush=True)
+
+
 def _resolve_model(model: str | None) -> str:
     if model is not None:
         return model
@@ -109,8 +141,9 @@ def generate(
     httpx.HTTPStatusError
         If Ollama returns a non-2xx status.
     """
+    resolved_model = _resolve_model(model)
     payload: dict[str, Any] = {
-        "model": _resolve_model(model),
+        "model": resolved_model,
         "prompt": prompt,
         "stream": False,
     }
@@ -118,6 +151,11 @@ def generate(
         payload["format"] = format
     if options is not None:
         payload["options"] = options
+
+    _debug_emit(
+        f"-> POST /api/generate model={resolved_model} format={format!r} "
+        f"prompt_len={len(prompt)} prompt={_truncate_for_debug(prompt)!r}"
+    )
 
     try:
         with httpx.Client(timeout=_DEFAULT_TIMEOUT) as client:
@@ -137,6 +175,10 @@ def generate(
         raise OllamaError(
             f"Ollama returned a non-string `response` field: {type(text).__name__}"
         )
+    _debug_emit(
+        f"<- model={resolved_model} response_len={len(text)} "
+        f"response={_truncate_for_debug(text)!r}"
+    )
     return text
 
 
@@ -165,7 +207,21 @@ def generate_json(
     try:
         parsed: Any = json.loads(raw)
     except json.JSONDecodeError as exc:
+        # Surface the offending substring around the parse position so the
+        # human can see *where* Gemma drifted from JSON, not just that it
+        # did. The full raw response is still on the exception for callers.
+        snippet_start = max(0, exc.pos - 80)
+        snippet_end = min(len(raw), exc.pos + 80)
+        _debug_emit(
+            f"!! JSON parse error at pos={exc.pos}: {exc.msg} | "
+            f"context={raw[snippet_start:snippet_end]!r} | "
+            f"raw_len={len(raw)}"
+        )
         raise OllamaInvalidJSONError(raw) from exc
     if not isinstance(parsed, dict):
+        _debug_emit(
+            f"!! JSON parsed but is {type(parsed).__name__}, not dict; "
+            f"raw={_truncate_for_debug(raw)!r}"
+        )
         raise OllamaInvalidJSONError(raw)
     return parsed

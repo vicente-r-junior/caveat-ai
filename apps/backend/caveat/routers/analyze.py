@@ -135,7 +135,9 @@ def analyze_document(document_id: str) -> AnalyzeResponse:
 
         playbook = load_playbook(contract_type)
         analysis_result = analyze(text, contract_type, playbook)
-        summary = build_client_summary(analysis_result.findings, contract_type, text)
+        summary, summary_warnings = build_client_summary(
+            analysis_result.findings, contract_type, text
+        )
     except OllamaUnreachableError as exc:
         # Surface the daemon-down case explicitly so the frontend can render
         # a "Is Ollama running?" hint instead of a generic 5xx (Constitution VI).
@@ -172,6 +174,9 @@ def analyze_document(document_id: str) -> AnalyzeResponse:
             recommendation=summary.recommendation,
             disclaimer=summary.disclaimer,
         ),
-        warnings=list(analysis_result.warnings),
+        # Merge analyze + client_summary warnings into a single channel.
+        # Both stages emit Constitution VI signals (silent-empty findings,
+        # malformed JSON, per-field fallback) and the lawyer needs both.
+        warnings=list(analysis_result.warnings) + list(summary_warnings),
         elapsed_seconds=elapsed,
     )

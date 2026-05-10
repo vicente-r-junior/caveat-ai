@@ -414,3 +414,130 @@ Other notes carried forward from sprint-0-validation.md and not addressed here (
 ---
 
 **Sprint 1 is ready for validation.** Run `just verify-sprint-1` and walk through scenarios 1–9 above. Tell me what you find.
+
+---
+
+## Fixup-2 — Constitution VI silent-empty findings (2026-05-09)
+
+**Bug found during Scenario 3 manual validation on M4 Air 24GB with `gemma4:e4b`.**
+
+The real-Ollama analyze on `msa-acme.pdf` returned HTTP 200 in 292.74 seconds with `findings=[]`, `warnings=[]`, and a client summary whose four narrative fields were all the `(Not available — model output incomplete.)` placeholder. **An empty findings list with an empty warnings list is dishonest output**: per Constitution VI ("Honesty over polish") the system must surface failures, not paper over them with silent empty defaults.
+
+### Root cause
+
+Two distinct silent-empty paths existed in the pipeline:
+
+**A. `analyze.py` — `_coerce_findings` returned `[]` for four indistinguishable cases:**
+
+1. `payload["findings"]` missing entirely
+2. `payload["findings"]` present but not a list (string / dict / scalar)
+3. `payload["findings"]` is a list but every entry was malformed (missing required field, wrong type)
+4. The model legitimately returned `{"findings": []}`
+
+All four cases routed to `validate_citations([], text)`, which produces `failure_rate == 0.0` and skipped the retry branch — returning `AnalysisResult(findings=(), warnings=())`. The retry condition only fires when `dropped > 0`; with `dropped == 0` the empty result was treated as a perfect run.
+
+**B. `client_summary.py` — `build_client_summary` had no warnings channel at all.**
+
+The function returned just `ClientSummary`, so both the `OllamaInvalidJSONError` exception path and the per-field `_FIELD_FALLBACK` substitution were silent to the caller. The router had no way to know the summary failed; the user saw the placeholder text in the response with no warning explaining why.
+
+### What the debug log revealed
+
+With `CAVEAT_DEBUG_LLM=true` (new flag, see fix C below), a fresh real-Ollama curl on the same fixture captured at `/tmp/sprint1-real-llm-debug.log` showed exactly what `gemma4:e4b` produced:
+
+- **Classify** (prompt 8,834 chars): `{"contract_type": "MSA"}` — correct.
+- **Analyze** (prompt 26,048 chars): valid JSON but the **wrong schema**. The model returned `{"summary": "...", "key_clauses": [...], "risks_for_client": [...], "recommendations_for_client": [...]}` — no `findings` key at all.
+- **Client summary** (prompt 21,528 chars): valid JSON but again the **wrong schema**. The model returned `{"document_type": "Service Agreement", "parties": [...], "scope_of_services": {...}, ...}` instead of the requested four narrative fields.
+
+**Interpretation:** `gemma4:e4b` (8 B params, Q4_K_M) follows simple short-prompt schemas (the 8 K classify prompt) but its instruction-following degrades at long context — at 21–26 K characters with the deeply structured playbook embedded, the model abandoned the requested schema and produced its own plausible-looking JSON about the document. Ollama's JSON-mode (`format="json"`) only guarantees *valid* JSON; it does not enforce a specific schema. The classify call succeeded because the schema was one field and the prompt fit comfortably; the analyze and summary calls failed because e4b couldn't hold both the long contract + playbook + output schema in instruction-following memory.
+
+This is a **model capability ceiling**, not a code bug — but the code now surfaces it instead of hiding it.
+
+### What changed
+
+**A. `apps/backend/caveat/pipeline/analyze.py`** — distinguish the four silent-empty cases:
+
+- Replaced `_coerce_findings(...) -> list[Finding]` with `_coerce_findings(...) -> _CoerceResult`, where `_CoerceResult` carries `findings`, `raw_count`, and `findings_field_present` so the caller can detect *which* failure mode produced an empty list.
+- New `_structural_warning(coerce, on_retry)` helper emits one of three warnings:
+  - "model output had no usable `findings` field (either missing or not a list)"
+  - "model returned zero findings ... verify against the source"
+  - "model returned N finding(s) but every entry was malformed"
+- `analyze()` calls `_structural_warning` after each pass. **Structural failures do NOT trigger a retry** — on E4B a second pass costs minutes, and a structural failure is unlikely to flip on an identical call against the same model + same prompt. The existing `failure_rate > 0.30` retry path for hallucinated quotes is unchanged.
+
+**B. `apps/backend/caveat/pipeline/client_summary.py`** — add a warnings channel:
+
+- Return type changed from `ClientSummary` to `tuple[ClientSummary, tuple[str, ...]]`. Mirrors the shape of `AnalysisResult`.
+- `OllamaInvalidJSONError` path now emits: *"Client summary: model returned malformed JSON. All four narrative fields are placeholders; rerun the analysis or fall back to attorney drafting."*
+- Per-field fallback path now emits: *"Client summary: model omitted or left empty: <field names>. Each missing field shows a fallback placeholder."* — names only the fields that actually fell back. `biggest_risks` is intentionally excluded from this check because an empty risks tuple is a legitimate "no material risks" signal per the `ClientSummary` docstring, not a fallback.
+
+**C. `apps/backend/caveat/llm/ollama_client.py`** — add `CAVEAT_DEBUG_LLM` diagnostic flag:
+
+- New `Settings.debug_llm: bool = False` field on `apps/backend/caveat/config.py` (env: `CAVEAT_DEBUG_LLM=true`).
+- When enabled, every `generate()` call emits to **stderr**:
+  - `-> POST /api/generate model=... format=... prompt_len=... prompt='...'` (truncated to 4 KB)
+  - `<- model=... response_len=... response='...'` (truncated to 4 KB)
+- When `generate_json()` hits a `JSONDecodeError`, also emits the offending substring around the parse position (80 chars on each side) plus the raw length.
+- Off by default — these prints are noisy and would clutter test/CI output. Uses `print(file=sys.stderr)` rather than `logging.StreamHandler(sys.stderr)` so pytest's `capsys` (which reassigns `sys.stderr` per-test) can capture the output.
+
+**D. `apps/backend/caveat/routers/analyze.py`** — merge both warning sources:
+
+- Unpacks `summary, summary_warnings = build_client_summary(...)`.
+- `AnalyzeResponse.warnings = list(analysis_result.warnings) + list(summary_warnings)`.
+
+### Tests added (all in `apps/backend/tests/unit/`)
+
+- **`test_analyze.py`** (+6 tests, total 11): silent-empty paths and no-retry guarantee:
+  - `test_analyze_warns_when_model_returns_empty_findings_list`
+  - `test_analyze_warns_when_findings_field_missing`
+  - `test_analyze_warns_when_findings_field_wrong_type`
+  - `test_analyze_warns_when_all_entries_malformed` — pins the "raw_count > 0 but coerce empty" case explicitly, asserts `"3"` appears in the warning so the count is surfaced.
+  - `test_analyze_does_not_retry_on_structural_empty` — counts Ollama calls; structural failures must call `generate_json` exactly once.
+  - `test_analyze_warns_when_retry_returns_structural_empty` — structural failure on the *second* pass must say "on retry".
+- **`test_client_summary.py`** (updated existing 5, added 2, total 7): all callers now unpack the tuple. New tests:
+  - `test_client_summary_no_warnings_when_only_risks_empty` — empty `biggest_risks` alone must NOT produce a warning (legitimate "no material risks" signal).
+  - `test_client_summary_warning_lists_only_offending_fields` — warning enumerates exactly the fields that fell back, no extras.
+  - The existing `test_client_summary_disclaimer_on_invalid_json` test now also asserts the malformed-JSON warning is present.
+- **`test_ollama_client.py`** (+4 tests, total 12): `CAVEAT_DEBUG_LLM` flag:
+  - `test_debug_logging_silent_by_default` — no `[caveat.llm.debug]` lines on stderr without the flag.
+  - `test_debug_logging_emits_prompt_and_response_when_enabled` — both directions visible.
+  - `test_debug_logging_truncates_long_payloads` — 5 KB prompt produces a `truncated` marker, full text is not dumped.
+  - `test_debug_logging_emits_json_parse_error_context` — invalid JSON response emits `"JSON parse error"` plus context substring on stderr.
+
+Full unit suite: **77 tests in 1.59 s** (was 64 in 0.95 s). Backend E2E: **13 tests in 25.4 s** (no changes, contract preserved). Frontend: unchanged (11 unit + 1 Playwright).
+
+### Verification on the original failing scenario
+
+Same DOC_ID, same fixture, fresh backend with `CAVEAT_DEBUG_LLM=true`:
+
+```
+=== START 21:27:21 ===
+=== END 21:33:22 ===   (360.3 seconds — first analyze of the new backend session,
+                        cold-start similar to before)
+```
+
+Response now contains:
+
+```json
+{
+  "document_id": "1576168c-ab6a-4224-b2b2-4a7eba21502a",
+  "contract_type": "MSA",
+  "findings": [],
+  "client_summary": { ... four placeholders + disclaimer ... },
+  "warnings": [
+    "Analyze stage on first pass: model output had no usable `findings` field (either missing or not a list). No findings produced. The model may be undersized for this contract or the response may have been truncated.",
+    "Client summary: model omitted or left empty: what_this_contract_is, what_youre_committing_to, recommendation. Each missing field shows a fallback placeholder."
+  ],
+  "elapsed_seconds": 360.33
+}
+```
+
+Two honest warnings instead of `warnings: []`. Constitution VI satisfied: the lawyer now sees that `gemma4:e4b` could not produce schema-conformant output for this contract and the recommendation is to retry with `gemma4:31b-instruct-q4_K_M` (the production target model) on capable hardware.
+
+The full debug log is committed nowhere (it's at `/tmp/sprint1-real-llm-debug.log`, an ephemeral location) but its key content is summarised above. To reproduce: `CAVEAT_DEBUG_LLM=true uv run uvicorn caveat.main:app --port 8787` and the lines starting with `[caveat.llm.debug]` will be on stderr.
+
+### What did NOT change
+
+- Citation validator (`validate_citations.py`) — untouched. The contract is sound and was never the issue.
+- Public API shape of `POST /api/analyze/{id}` — preserved: same fields, same types. Only the `warnings` list now actually carries content when content exists.
+- No-network test guard (`tests/conftest.py`) — untouched.
+- Read timeout in `ollama_client.py` — kept at 300 s (set by fixup-1).
+- Any pipeline stage other than `analyze` and `client_summary`.
