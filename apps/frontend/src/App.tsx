@@ -1,85 +1,97 @@
-import { useEffect, useState } from 'react';
-import { apiGet } from './api/client';
+/**
+ * Caveat AI — App shell.
+ *
+ * Owns the persistent chrome (Topbar at the top, DisclaimerFooter at the
+ * bottom) and the React Router surface. The disclaimer is rendered here
+ * deliberately so every route inherits it (Constitution IV — disclaimers
+ * are part of the product and must appear on every screen with AI output).
+ *
+ * The active document context (filename + meta string for the topbar) and
+ * the Topbar status pill state live at this level so any child route can
+ * update them via the typed `Outlet` context without prop-drilling.
+ */
 
-type HealthResponse = {
-  status: string;
-  model: string;
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  BrowserRouter,
+  Outlet,
+  Route,
+  Routes,
+  useOutletContext,
+} from 'react-router-dom';
+import { DisclaimerFooter } from './components/DisclaimerFooter';
+import { Topbar } from './components/Topbar';
+import { getHealth } from './api/health';
+import { Upload } from './pages/Upload';
+import { Processing } from './pages/Processing';
+import { Review } from './pages/Review';
+
+export type DocContext = { filename: string; meta?: string } | null;
+
+export type AppContextValue = {
+  setActiveDoc: (doc: DocContext) => void;
+  setStatus: (status: 'idle' | 'working') => void;
 };
 
-type LoadState = 'loading' | 'ok' | 'error';
+/** Hook used by route components to update the persistent chrome. */
+export function useAppContext(): AppContextValue {
+  return useOutletContext<AppContextValue>();
+}
 
-const STATUS_DOT: Record<LoadState, string> = {
-  loading: 'bg-warn',
-  ok: 'bg-safe',
-  error: 'bg-danger',
-};
-
-const STATUS_LINE: Record<LoadState, string> = {
-  loading: 'loading',
-  ok: 'ok',
-  error: 'unreachable',
-};
-
-export function App(): JSX.Element {
-  const [state, setState] = useState<LoadState>('loading');
+function Shell(): JSX.Element {
   const [model, setModel] = useState<string | null>(null);
+  const [activeDoc, setActiveDoc] = useState<DocContext>(null);
+  const [status, setStatus] = useState<'idle' | 'working'>('idle');
 
   useEffect(() => {
     let cancelled = false;
-    apiGet<HealthResponse>('/health')
+    getHealth()
       .then((data) => {
         if (cancelled) return;
         setModel(data.model);
-        setState('ok');
       })
       .catch(() => {
-        if (cancelled) return;
-        setState('error');
+        // Backend unreachable — Topbar's null-model branch already shows
+        // a "Connecting…" pill, which is the honest empty state.
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const pillLabel =
-    state === 'ok' && model
-      ? `Local · Gemma 4 · ${model}`
-      : state === 'loading'
-        ? 'Local · Connecting…'
-        : 'Local · Backend unreachable';
+  const handleSetActiveDoc = useCallback((doc: DocContext) => {
+    setActiveDoc(doc);
+  }, []);
+  const handleSetStatus = useCallback((next: 'idle' | 'working') => {
+    setStatus(next);
+  }, []);
+
+  const ctx = useMemo<AppContextValue>(
+    () => ({ setActiveDoc: handleSetActiveDoc, setStatus: handleSetStatus }),
+    [handleSetActiveDoc, handleSetStatus],
+  );
 
   return (
-    <main className="min-h-screen bg-bg flex items-center justify-center px-8 py-16">
-      <section className="w-full max-w-xl flex flex-col items-center text-center gap-6">
-        <p className="font-mono text-[10px] tracking-[0.18em] text-ink-muted uppercase">
-          Sprint 0 — Scaffold
-        </p>
+    <div className="min-h-screen flex flex-col bg-bg text-ink">
+      <Topbar docContext={activeDoc} status={status} model={model} />
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <Outlet context={ctx} />
+      </main>
+      <DisclaimerFooter />
+    </div>
+  );
+}
 
-        <h1 className="font-serif text-4xl font-semibold tracking-tight text-ink">
-          Caveat AI
-        </h1>
-
-        <span
-          className="font-mono text-[10px] tracking-[0.10em] uppercase bg-bg-soft border border-line rounded px-2.5 py-1 inline-flex items-center gap-2 text-ink-soft"
-          data-testid="status-pill"
-        >
-          <span
-            aria-hidden="true"
-            className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[state]}`}
-          />
-          {pillLabel}
-        </span>
-
-        <p className="text-ink-soft text-sm" data-testid="status-line">
-          Backend status: {STATUS_LINE[state]}
-        </p>
-
-        <footer className="pt-8 mt-4 border-t border-line-soft w-full">
-          <p className="font-mono text-[10px] tracking-[0.18em] text-ink-muted uppercase">
-            AI-generated output — attorney review required
-          </p>
-        </footer>
-      </section>
-    </main>
+export function App(): JSX.Element {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Shell />}>
+          <Route path="/" element={<Upload />} />
+          <Route path="/processing/:docId" element={<Processing />} />
+          <Route path="/review/:docId" element={<Review />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }

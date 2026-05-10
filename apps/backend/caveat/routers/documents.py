@@ -103,7 +103,7 @@ async def upload_document(
     contents = await file.read()
     if len(contents) > _MAX_UPLOAD_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="PDF exceeds 10 MB limit",
         )
 
@@ -120,7 +120,7 @@ async def upload_document(
             parsed = parse_pdf(Path(tmp_path))
         except ScannedPDFError as exc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=str(exc),
             ) from exc
         except (PdfReadError, ValueError, OSError) as exc:
@@ -128,7 +128,7 @@ async def upload_document(
             # surface here. We give a clear "could not parse" message so the
             # lawyer knows it is a file problem rather than a tool bug.
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Could not parse PDF: {exc}",
             ) from exc
 

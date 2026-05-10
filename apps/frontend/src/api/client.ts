@@ -37,10 +37,19 @@ function buildUrl(path: string): string {
 
 async function handle<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    throw new ApiError(
-      `Request failed: ${response.status} ${response.statusText}`,
-      response.status,
-    );
+    // Surface the backend's `detail` verbatim when present so the UI can
+    // render an honest message (Constitution VI). Falls back to the HTTP
+    // status line when the body is not JSON.
+    let message = `Request failed: ${response.status} ${response.statusText}`;
+    try {
+      const json = (await response.json()) as { detail?: unknown };
+      if (typeof json.detail === 'string' && json.detail.trim() !== '') {
+        message = json.detail;
+      }
+    } catch {
+      // Body wasn't JSON; keep the generic message.
+    }
+    throw new ApiError(message, response.status);
   }
   return (await response.json()) as T;
 }
@@ -65,6 +74,38 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   return handle<T>(response);
+}
+
+/**
+ * Multipart upload variant — does NOT set Content-Type so the browser
+ * (or undici in tests) attaches the correct multipart/form-data boundary.
+ * Reuses {@link assertRelative} so the local-only guard still applies.
+ */
+export async function apiPostFormData<T>(
+  path: string,
+  body: FormData,
+): Promise<T> {
+  assertRelative(path);
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body,
+  });
+  if (!response.ok) {
+    // Try to surface the backend's `detail` field verbatim so the caller
+    // can display it (Constitution VI — honest about what failed).
+    let detail = `Request failed: ${response.status} ${response.statusText}`;
+    try {
+      const json = (await response.json()) as { detail?: unknown };
+      if (typeof json.detail === 'string' && json.detail.trim() !== '') {
+        detail = json.detail;
+      }
+    } catch {
+      // Body wasn't JSON; keep the generic message.
+    }
+    throw new ApiError(detail, response.status);
+  }
+  return (await response.json()) as T;
 }
 
 export { ApiError };

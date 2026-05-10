@@ -100,6 +100,15 @@ verify-sprint-1:
     @echo "Now walk through the manual scenarios in sprints/sprint-1-validation.md."
     @echo "(The real-Ollama scenario requires `ollama serve` running with gemma4:e4b pulled.)"
 
+verify-sprint-2:
+    just install
+    just check
+    just test-e2e
+    @echo ""
+    @echo "Sprint 2 verification: PASS"
+    @echo "Now walk through the manual scenarios in sprints/sprint-2-validation.md."
+    @echo "(The full upload→processing→findings flow requires `ollama serve` running with gemma4:e4b pulled.)"
+
 # ----------------------------------------------------------------------
 # Demo — load seed data for the contest demo (Sprint 6).
 # Stub for now.
