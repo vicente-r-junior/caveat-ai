@@ -19,6 +19,7 @@ from pypdf import PdfWriter
 
 from caveat.config import get_settings
 from caveat.main import create_app
+from caveat.storage import db
 from caveat.storage.db import init_db
 
 _FIXTURES = Path(__file__).parents[3].parent / "fixtures" / "contracts"
@@ -57,6 +58,33 @@ def test_upload_msa_acme_returns_document_id(client: TestClient) -> None:
     assert body["page_count"] == 8
     # Contract type is set on /analyze, not on upload.
     assert body["contract_type"] is None
+
+
+def test_upload_persists_sections_for_msa_acme(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """Sprint 3 (T004): upload writes the parsed sections into SQLite.
+
+    The Source tab depends on this — without a non-empty
+    ``list_sections_for_document`` the analyse handler emits a
+    Constitution VI warning and the Source tab renders empty.
+    """
+    body = _upload_msa(client)
+    doc_id = body["document_id"]
+    assert isinstance(doc_id, str)
+
+    db_path = tmp_path / "data.db"
+    sections = db.list_sections_for_document(doc_id, path=db_path)
+
+    assert len(sections) > 0
+    # Sections come back in idx order.
+    assert [s["idx"] for s in sections] == sorted(s["idx"] for s in sections)
+    # Every section row carries the required Sprint 3 columns.
+    for section in sections:
+        for key in ("idx", "number", "title", "body", "char_start", "char_end", "page"):
+            assert key in section
+    # And the first section's body is non-empty (real content, not a placeholder).
+    assert sections[0]["body"] != ""
 
 
 def test_list_documents_after_upload(client: TestClient) -> None:

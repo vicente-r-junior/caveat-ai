@@ -63,7 +63,16 @@ export async function apiGet<T>(path: string): Promise<T> {
   return handle<T>(response);
 }
 
-export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+export type ApiRequestOptions = {
+  /** Optional AbortSignal threaded through to the underlying fetch. */
+  signal?: AbortSignal;
+};
+
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  options?: ApiRequestOptions,
+): Promise<T> {
   assertRelative(path);
   const response = await fetch(buildUrl(path), {
     method: 'POST',
@@ -72,6 +81,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
+    signal: options?.signal,
   });
   return handle<T>(response);
 }

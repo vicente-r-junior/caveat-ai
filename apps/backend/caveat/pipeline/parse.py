@@ -47,13 +47,30 @@ class Section:
     """A detected section heading inside the contract.
 
     ``start_offset`` is the character offset of the heading inside the
-    joined :attr:`ParsedDocument.text`. ``page`` is 1-indexed.
+    joined :attr:`ParsedDocument.text`. ``char_end`` is the offset of the
+    next section's heading (or ``len(text)`` for the last section), so the
+    half-open interval ``[start_offset, char_end)`` covers everything that
+    belongs to this section, heading line included. ``body`` is the section
+    content with the heading line stripped: it starts at the character
+    immediately after the heading line's trailing newline (or equals
+    ``""`` when the heading is the last line of the document) and runs to
+    ``char_end``. ``page`` is 1-indexed.
+
+    Sprint 3 (T002) added ``body`` and ``char_end`` so the source viewer
+    can render section-by-section without re-deriving slices in the router
+    (Constitution VI: surface what we already know rather than recompute).
+    A synthetic ``Section(number="0", title="Preamble", ...)`` is emitted
+    when text precedes the first detected heading, so ``source_sections``
+    is always a complete cover of the document text — silently dropping
+    pre-heading prose would violate Constitution VI.
     """
 
     number: str
     title: str
     start_offset: int
     page: int
+    body: str
+    char_end: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -70,13 +87,54 @@ class ParsedDocument:
     page_count: int
 
 
-def _detect_sections(pages: tuple[str, ...]) -> tuple[Section, ...]:
+@dataclass(slots=True, frozen=True)
+class _SectionMarker:
+    """Internal: a heading hit before body/char_end have been computed.
+
+    Two-pass detection — first walk pages and emit one marker per heading
+    line (cheap, line-by-line), then a second pass fills ``body`` and
+    ``char_end`` by indexing into the already-joined document text.
+    """
+
+    number: str
+    title: str
+    start_offset: int
+    page: int
+    heading_line_end: int
+    """Offset of the character immediately after the heading line's
+    trailing ``\\n`` inside ``text``, or ``len(text)`` if the heading is
+    the final line of the document. Used as the ``body`` start when the
+    second pass fills in section bodies."""
+
+
+def _detect_sections(pages: tuple[str, ...], text: str) -> tuple[Section, ...]:
     """Walk every line of every page and emit a Section per matching heading.
 
-    Uses a running offset that tracks where each page starts inside the
-    joined ``"\\n\\n".join(pages)`` text. Pages are 1-indexed in the output.
+    The function is two-pass:
+
+    1. Walk pages line-by-line and emit a :class:`_SectionMarker` per hit.
+       The marker stashes the offset of the character immediately after
+       the heading line's trailing newline so the second pass can carve
+       the body without re-scanning the joined text.
+    2. Post-process the marker list: each section's ``char_end`` is the
+       next marker's ``start_offset`` (or ``len(text)`` for the last);
+       its ``body`` is ``text[heading_line_end:char_end]``.
+
+    Constitution VI corrections layered in here:
+
+    * If any text precedes the first detected heading, prepend a synthetic
+      preamble section so the document text is fully covered by
+      ``source_sections``. Skipping the preamble would silently lose any
+      recitals or front-matter the model legitimately quoted.
+    * If zero headings were detected at all *and* the document still has
+      text, emit a single whole-document fallback section so
+      ``source_sections`` is never empty when the document has body text.
+      This keeps the Source tab populated for outline-numbered contracts
+      ("I.", "A.", "1.") that the regex was not tuned for.
+
+    Pages are 1-indexed in the output.
     """
-    sections: list[Section] = []
+    markers: list[_SectionMarker] = []
     cursor = 0
     page_separator = "\n\n"
     for page_index, page_text in enumerate(pages):
@@ -103,12 +161,19 @@ def _detect_sections(pages: tuple[str, ...]) -> tuple[Section, ...]:
                     # Fall back to whatever the regex captured (a single
                     # capitalized word) so the title is never empty.
                     full_title = parts[1] if len(parts) > 1 else ""
-                sections.append(
-                    Section(
+                start_offset = cursor + line_offset
+                # End of the heading line inside ``text``. ``line`` does
+                # not include the trailing ``\n``; account for it by
+                # adding 1, but cap at len(text) for the file's final line
+                # which has no trailing newline.
+                heading_line_end = min(start_offset + len(line) + 1, len(text))
+                markers.append(
+                    _SectionMarker(
                         number=number,
                         title=full_title,
-                        start_offset=cursor + line_offset,
+                        start_offset=start_offset,
                         page=page_number,
+                        heading_line_end=heading_line_end,
                     )
                 )
             # +1 for the "\n" we split on.
@@ -118,6 +183,68 @@ def _detect_sections(pages: tuple[str, ...]) -> tuple[Section, ...]:
         cursor += len(page_text)
         if page_index < len(pages) - 1:
             cursor += len(page_separator)
+
+    # ---- Second pass: fill body + char_end -------------------------------
+    sections: list[Section] = []
+
+    if markers:
+        # Constitution VI: if any text precedes the first detected
+        # heading, surface it as a synthetic preamble section so
+        # source_sections covers the whole document. Recitals,
+        # signature-block letterhead, and "WHEREAS" front-matter all
+        # legitimately end up here on real contracts.
+        first_offset = markers[0].start_offset
+        if first_offset > 0:
+            sections.append(
+                Section(
+                    number="0",
+                    title="Preamble",
+                    start_offset=0,
+                    page=1,
+                    body=text[0:first_offset],
+                    char_end=first_offset,
+                )
+            )
+
+        for index, marker in enumerate(markers):
+            char_end = (
+                markers[index + 1].start_offset
+                if index + 1 < len(markers)
+                else len(text)
+            )
+            # ``body`` excludes the heading line itself (everything from
+            # the character after the heading's trailing ``\n`` up to the
+            # next section's start). When the heading is the last line of
+            # the document, ``heading_line_end == len(text)`` so the body
+            # is an empty string — accurate, not a defect.
+            body_start = min(marker.heading_line_end, char_end)
+            sections.append(
+                Section(
+                    number=marker.number,
+                    title=marker.title,
+                    start_offset=marker.start_offset,
+                    page=marker.page,
+                    body=text[body_start:char_end],
+                    char_end=char_end,
+                )
+            )
+        return tuple(sections)
+
+    # Zero headings detected. Emit a single whole-document fallback if
+    # there is any text to cover so source_sections is never empty for a
+    # readable document — Constitution VI: degraded-but-honest beats
+    # silently-empty.
+    if text:
+        sections.append(
+            Section(
+                number="0",
+                title="Document",
+                start_offset=0,
+                page=1,
+                body=text,
+                char_end=len(text),
+            )
+        )
     return tuple(sections)
 
 
@@ -151,7 +278,7 @@ def parse_pdf(path: Path) -> ParsedDocument:
             "supported in the MVP. Please upload a text-based PDF."
         )
 
-    sections = _detect_sections(pages_tuple)
+    sections = _detect_sections(pages_tuple, text)
     return ParsedDocument(
         text=text,
         pages=pages_tuple,

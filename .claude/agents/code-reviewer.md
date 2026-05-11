@@ -63,6 +63,18 @@ Check:
 
 Compare the diff against the sprint file's "In scope" and "Out of scope" lists. Flag any work that's out of scope for this sprint.
 
+### Documented intent vs. actual implementation
+
+When a file's docstrings, comments, JSDoc blocks, or referenced specs describe a specific behavior or invariant, verify that the implementation actually delivers it. **This is a distinct check class from "general code review" — it requires you to cross-reference the diff against the prose written alongside it, not against your own judgement of "good code."**
+
+Two patterns to look for, both based on real Sprint 3 incidents:
+
+1. **A claim in one file that depends on behavior in another file.** When `apps/frontend/src/pages/Processing.tsx`'s module docstring said *"passing the analysis through router state to avoid a re-fetch"*, that was a load-bearing contract on `apps/frontend/src/pages/Review.tsx` (the consumer of the router state). The Sprint 3 closure walk surfaced a duplicate `POST /api/analyze` because Review.tsx ignored the preloaded `state.analysis` and re-fetched anyway. Reviewing each file in isolation found nothing wrong; reviewing the two together against the docstring's claim would have caught it. **When file A's prose makes a claim about flow that crosses into file B, read both files and verify the claim holds end-to-end.**
+
+2. **Comments that describe an invariant the test suite does not cover.** A comment saying *"this useEffect only fires once per docId"* or *"the disclaimer is non-removable"* or *"warnings always render verbatim"* is a load-bearing contract. Verify there is a test that pins exactly that invariant — if not, flag it as a missing test, not just a comment. A claim with no test is structurally untrue under future refactor.
+
+Reporting: when you find a divergence between documented intent and implementation, cite both the docstring/comment file:line **and** the implementation file:line that breaks it. Treat divergences as Critical (block commit) when they cross constitutional principles, Warning otherwise.
+
 ### General code review
 
 - Any obvious bugs (off-by-one, wrong type, unhandled error path)

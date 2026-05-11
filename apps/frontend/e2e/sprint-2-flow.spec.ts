@@ -62,6 +62,7 @@ test.describe('Sprint 2 — full upload → processing → review flow', () => {
               explanation: 'A 3-month cap is well below market.',
               redline:
                 'Replace three (3) months with twelve (12) months.',
+              source_offset: null,
             },
             {
               severity: 'medium',
@@ -70,6 +71,7 @@ test.describe('Sprint 2 — full upload → processing → review flow', () => {
                 'Customer is not entitled to any refund of prepaid amounts upon termination.',
               explanation: 'Industry norm is pro-rata refund.',
               redline: '',
+              source_offset: null,
             },
           ],
           client_summary: {
@@ -82,6 +84,7 @@ test.describe('Sprint 2 — full upload → processing → review flow', () => {
           },
           warnings: [],
           elapsed_seconds: 1.2,
+          source_sections: [],
         }),
       });
     });
@@ -202,6 +205,7 @@ test.describe('Sprint 2 — full upload → processing → review flow', () => {
           },
           warnings,
           elapsed_seconds: 360.3,
+          source_sections: [],
         }),
       });
     });

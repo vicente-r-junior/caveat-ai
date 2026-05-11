@@ -9,13 +9,15 @@
  * make this instant via local persistence).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAppContext } from '../App';
 import { ApiError } from '../api/client';
 import { type AnalyzeResponse, analyzeDocument } from '../api/analyze';
 import { TabPlaceholder } from '../components/TabPlaceholder';
 import { Findings } from '../tabs/Findings';
+import { ClientSummary } from '../tabs/ClientSummary';
+import { Source } from '../tabs/Source';
 
 type TabKey = 'findings' | 'summary' | 'source' | 'chat';
 
@@ -30,28 +32,63 @@ export function Review(): JSX.Element {
   const { setActiveDoc, setStatus } = useAppContext();
 
   const initialState = (location.state ?? null) as LocationState;
-  const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(
-    initialState?.analysis ?? null,
-  );
+  // When Processing navigates to /review/:id with the analysis in router
+  // state, we should NEVER re-fetch — the analysis already arrived. The
+  // `preloaded` flag drives both the initial useState value AND the early
+  // return in the fetch effect, so StrictMode's double-mount cannot fire
+  // a duplicate analyze call. Sprint 3 fixup-1.
+  const preloaded = initialState?.analysis ?? null;
+  const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(preloaded);
   const [filename, setFilename] = useState<string>(
     initialState?.filename ?? 'Document',
   );
   const [recoverError, setRecoverError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('findings');
+  // Sprint 3 fixup-2: dedupe POST /api/analyze/{docId} under StrictMode's
+  // dev double-mount on the cold-mount path. Set before the fetch
+  // dispatch; second mount short-circuits without firing a second POST.
+  const fetchedForDocIdRef = useRef<string | null>(null);
+  // Sprint 3 cross-tab linking: Source highlight click sets this to the
+  // original finding index; Findings.tsx watches the prop, scrolls the
+  // matching card into view, then calls onTargetHandled to clear.
+  const [targetFindingIndex, setTargetFindingIndex] = useState<number | null>(
+    null,
+  );
 
   // Hard-refresh recovery: no router state → re-run analyze.
+  //
+  // Sprint 3 fixup-2: the dedupe ref (`fetchedForDocIdRef`) guards the
+  // POST so StrictMode's dev double-mount cannot dispatch two HTTP
+  // requests. Set the ref *before* the fetch call. Combined with the
+  // `preloaded` short-circuit, this preserves the Processing → Review
+  // handoff invariant (router state means we never fetch at all) AND
+  // guarantees exactly one POST on a true cold mount (e.g., hard
+  // refresh on /review/:id).
+  //
+  // We deliberately do NOT abort on cleanup. Under StrictMode the
+  // first cleanup runs between the two mounts of the same effect;
+  // aborting there would kill the only fetch we ever made because the
+  // second mount short-circuits on the ref and never re-dispatches.
+  // The `controller.signal.aborted` checks in .then/.catch remain as
+  // defensive guards. State updates on an unmounted component are
+  // tolerated in React 18 without warnings.
   useEffect(() => {
+    if (preloaded) return;
     if (analysis || !docId) return;
-    let cancelled = false;
+    if (fetchedForDocIdRef.current === docId) return;
+    fetchedForDocIdRef.current = docId;
+
+    const controller = new AbortController();
     setStatus('working');
-    analyzeDocument(docId)
+    analyzeDocument(docId, { signal: controller.signal })
       .then((result) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         setAnalysis(result);
         setStatus('idle');
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         const message =
           err instanceof ApiError
             ? err.message
@@ -61,10 +98,7 @@ export function Review(): JSX.Element {
         setRecoverError(message);
         setStatus('idle');
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [analysis, docId, setStatus]);
+  }, [preloaded, analysis, docId, setStatus]);
 
   // Topbar context: filename + contract type + page count when we have it.
   useEffect(() => {
@@ -232,7 +266,7 @@ export function Review(): JSX.Element {
             label="Source"
             isActive={activeTab === 'source'}
             onClick={() => setActiveTab('source')}
-            badgeText={`${analysis.findings.length > 0 ? '—' : '0'}p`}
+            badgeText={String(analysis.source_sections.length || 0)}
             testId="tab-source"
           />
           <TabButton
@@ -258,20 +292,20 @@ export function Review(): JSX.Element {
 
         <div className="flex-1 overflow-y-auto bg-bg">
           {activeTab === 'findings' ? (
-            <Findings analysis={analysis} />
-          ) : activeTab === 'summary' ? (
-            <TabPlaceholder
-              sprintNumber={3}
-              tabNumber={2}
-              title="Client summary"
-              description="A plain-English memo for your client — what the contract is, what they're committing to, the top 3 risks, and a clear recommendation. Lands in Sprint 3."
+            <Findings
+              analysis={analysis}
+              targetFindingIndex={targetFindingIndex}
+              onTargetHandled={() => setTargetFindingIndex(null)}
             />
+          ) : activeTab === 'summary' ? (
+            <ClientSummary analysis={analysis} />
           ) : activeTab === 'source' ? (
-            <TabPlaceholder
-              sprintNumber={3}
-              tabNumber={3}
-              title="Source viewer"
-              description="The full source PDF, with cited passages highlighted in burgundy alongside the relevant findings. Lands in Sprint 3."
+            <Source
+              analysis={analysis}
+              onJumpToFinding={(i) => {
+                setActiveTab('findings');
+                setTargetFindingIndex(i);
+              }}
             />
           ) : (
             <TabPlaceholder

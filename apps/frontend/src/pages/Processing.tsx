@@ -84,6 +84,12 @@ export function Processing(): JSX.Element {
   // without becoming a dependency of the timer effect.
   const analysisRef = useRef<AnalyzeResponse | null>(null);
   const completedRef = useRef(false);
+  // Sprint 3 fixup-2: dedupe POST /api/analyze/{docId} under StrictMode's
+  // dev double-mount. The ref is set *before* the fetch dispatch, so the
+  // second mount of the analyze effect short-circuits without firing a
+  // second HTTP request. Scoped by docId so navigating to a different
+  // document still re-fetches.
+  const fetchedForDocIdRef = useRef<string | null>(null);
 
   // Keep the topbar in sync. Working pulse stays on for the duration.
   useEffect(() => {
@@ -98,19 +104,39 @@ export function Processing(): JSX.Element {
   }, [filename, pageCount, setActiveDoc, setStatus]);
 
   // Kick off the real analysis on mount.
+  //
+  // The ref guard (`fetchedForDocIdRef`) is set *before* the fetch
+  // dispatch so the second StrictMode mount short-circuits without
+  // constructing an AbortController or hitting the network.
+  //
+  // We intentionally do NOT abort on cleanup. Under StrictMode the
+  // first cleanup runs *between* the two mounts of the same effect;
+  // aborting there would kill the only fetch we ever made (the second
+  // mount short-circuits via the ref and never re-dispatches). The
+  // `controller.signal.aborted` checks in .then/.catch remain as
+  // defensive guards — always false in practice with this design.
+  // Processing only unmounts on success (navigate to /review) or when
+  // an error pane replaces it (no further fetch), so leaking an
+  // in-flight fetch on unmount is not a real concern; React 18
+  // tolerates the resulting refs + setState calls on the unmounted
+  // component without warnings.
   useEffect(() => {
     if (!docId) return;
-    let cancelled = false;
-    analyzeDocument(docId)
+    if (fetchedForDocIdRef.current === docId) return;
+    fetchedForDocIdRef.current = docId;
+
+    const controller = new AbortController();
+    analyzeDocument(docId, { signal: controller.signal })
       .then((result) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
         analysisRef.current = result;
         completedRef.current = true;
         // Fast-forward all stages to "done" — the backend beat the timer.
         setCurrentStage(STAGES.length);
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         const message =
           err instanceof ApiError
             ? err.message
@@ -120,9 +146,6 @@ export function Processing(): JSX.Element {
         completedRef.current = true;
         setError(message);
       });
-    return () => {
-      cancelled = true;
-    };
   }, [docId]);
 
   // Timer-driven stage advance. Holds on the LAST stage (index N-1) until

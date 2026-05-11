@@ -193,3 +193,26 @@ If a command doesn't exist yet, propose adding it to the `Justfile` rather than 
 ## Submission target
 
 Gemma 4 challenge on dev.to, deadline May 24, 2026.
+
+## Sprint 3 — Lessons Learned
+
+These are durable lessons surfaced during Sprint 3 closure. Read them before the next sprint closure walk; they describe categories of failure that automated tests alone do not catch.
+
+### Playwright with `page.route()` is browser-integration, not real E2E
+
+The current `apps/frontend/e2e/` suite mocks all backend responses at the browser layer via `page.route()` for speed (a full Vite + React + jsdom-free Chromium run is already ~10s; adding a real FastAPI + Ollama path would push that to minutes). This catches **browser-level** bugs — React StrictMode dispatch duplication, click handlers, route transitions, focus order — but does NOT exercise the real backend → pipeline → Ollama path. The Sprint 3 fix for the duplicate `POST /api/analyze` was authored against the mocked suite and pinned by `apps/frontend/e2e/analyze-call-count.spec.ts`, which is the right tool for *that* bug because the bug is in the browser.
+
+Implication: until Sprint 5 adds a `just test-real-e2e` recipe driving the live stack against a tiny fixture (or a stubbed-Ollama FastAPI mock returning a canned response in ms), the **manual walk against the real running stack is the only true end-to-end validation**. Treat it as a hard step in sprint closure, not a nice-to-have.
+
+### After code-review PASS, always do a manual walk before committing the final sprint task
+
+Sprint 3 demonstrated that automated tests (109 backend unit + 78 frontend unit + 18 backend E2E + 5 Playwright = 210 tests) and a green code-review can all PASS while real-world behavior is broken. The Sprint 3 duplicate-analyze bug had:
+
+1. A docstring in `Processing.tsx` explicitly stating *"passing the analysis through router state to avoid a re-fetch"*.
+2. A `Review.tsx` implementation that ignored the router state and re-fetched anyway.
+3. A green `processing-review-transition.test.tsx` that mocked away the StrictMode double-mount behavior.
+4. A green `@code-reviewer` PASS that checked implementation in isolation.
+
+All four things were true simultaneously. Only the manual upload of `nda-techcorp.pdf` exposed `POST /api/analyze` appearing twice in the backend log. Per Constitution Principle X (per-sprint validation), the manual walk is non-negotiable; the lesson is to never let "all tests green" stand in for it.
+
+The Sprint 3 fix landed in `Processing.tsx` and `Review.tsx` (useRef-based dedupe scoped by docId, set *before* fetch dispatch) plus a browser-level Playwright counter (`analyze-call-count.spec.ts`) that would have caught the original divergence. The `@code-reviewer` subagent prompt now carries an explicit "documented intent vs. actual implementation" check to make this class of divergence visible at review time.

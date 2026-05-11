@@ -25,7 +25,9 @@ Constitution
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
+import sqlite3
 import tempfile
 from pathlib import Path
 from typing import Annotated
@@ -36,6 +38,8 @@ from pypdf.errors import PdfReadError
 
 from caveat.pipeline.parse import ScannedPDFError, parse_pdf
 from caveat.storage import db
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -138,6 +142,38 @@ async def upload_document(
             text=parsed.text,
             contract_type=None,
         )
+
+        # Sprint 3 (T004): persist the parsed sections so the Source tab
+        # can render them. Best-effort by design — the document row has
+        # already committed at this point, so a failed sections insert
+        # leaves the document usable. The analyse handler surfaces a
+        # Constitution VI warning when ``list_sections_for_document`` is
+        # empty for a document that has text, so the lawyer always sees
+        # what happened. Refusing the upload over a sections failure
+        # would be worse than a degraded Source tab.
+        try:
+            db.insert_sections(
+                document_id,
+                [
+                    {
+                        "idx": i,
+                        "number": section.number,
+                        "title": section.title,
+                        "body": section.body,
+                        "char_start": section.start_offset,
+                        "char_end": section.char_end,
+                        "page": section.page,
+                    }
+                    for i, section in enumerate(parsed.sections)
+                ],
+            )
+        except sqlite3.Error:
+            _log.exception(
+                "Failed to persist sections for document %s; "
+                "Source tab will be empty for this upload",
+                document_id,
+            )
+
         return DocumentResponse(
             document_id=document_id,
             filename=file.filename or "uploaded.pdf",

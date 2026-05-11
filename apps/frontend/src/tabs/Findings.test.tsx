@@ -25,6 +25,7 @@ function makeFinding(overrides: Partial<Finding> = {}): Finding {
     quote: 'A literal quotation from the contract.',
     explanation: 'Why it matters.',
     redline: '',
+    source_offset: null,
     ...overrides,
   };
 }
@@ -45,6 +46,7 @@ function makeAnalysis(
     },
     warnings: [],
     elapsed_seconds: 1.5,
+    source_sections: [],
     ...overrides,
   };
 }

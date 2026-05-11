@@ -12,6 +12,7 @@
  *   - Use vi.useFakeTimers() per test and pump time deterministically.
  */
 
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, Outlet } from 'react-router-dom';
@@ -51,6 +52,7 @@ function makeAnalysis(
     },
     warnings: [],
     elapsed_seconds: 1.5,
+    source_sections: [],
     ...overrides,
   };
 }
@@ -233,6 +235,36 @@ describe('<Processing />', () => {
       screen.getByRole('link', { name: /Back to upload/i }),
     ).toHaveAttribute('href', '/');
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it('does not double-fire analyzeDocument under StrictMode', async () => {
+    // Sprint 3 fixup-2: the dedupe `fetchedForDocIdRef` in Processing.tsx
+    // must short-circuit StrictMode's intentional dev double-mount of the
+    // analyze effect. A never-resolving promise lets us count call
+    // dispatches without inducing navigation or stage advancement.
+    vi.mocked(analyzeDocument).mockImplementation(
+      () => new Promise(() => undefined),
+    );
+
+    render(
+      <StrictMode>
+        <MemoryRouter
+          initialEntries={[{ pathname: '/processing/abc', state: { filename: 'test.pdf' } }]}
+        >
+          <Routes>
+            <Route element={<OutletShell />}>
+              <Route path="/processing/:docId" element={<Processing />} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    // Drain microtasks so any effect-scheduled fetch would have landed.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(analyzeDocument).toHaveBeenCalledTimes(1);
   });
 
   it('hold-pulse: never auto-completes the last stage on the timer alone', () => {

@@ -46,6 +46,20 @@ CREATE TABLE IF NOT EXISTS findings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_findings_doc ON findings(document_id);
+
+CREATE TABLE IF NOT EXISTS sections (
+    id TEXT PRIMARY KEY,
+    document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    idx INTEGER NOT NULL,
+    number TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    char_start INTEGER NOT NULL,
+    char_end INTEGER NOT NULL,
+    page INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sections_doc_idx ON sections(document_id, idx);
 """
 
 
@@ -235,6 +249,85 @@ def list_findings_for_document(
             FROM findings
             WHERE document_id = ?
             ORDER BY created_at ASC, id ASC
+            """,
+            (document_id,),
+        ).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Sections CRUD (Sprint 3 — T003)
+# ---------------------------------------------------------------------------
+
+
+def insert_sections(
+    document_id: str,
+    sections: list[dict[str, Any]],
+    path: Path | None = None,
+) -> list[str]:
+    """Bulk-insert sections for a document. Returns generated ids in order.
+
+    Each section dict must carry: ``idx``, ``number``, ``title``, ``body``,
+    ``char_start``, ``char_end``, ``page``. Mirrors the shape of
+    :func:`insert_findings`. An empty input returns ``[]`` without opening
+    a write transaction — same fast-path as findings.
+
+    Per Constitution VI, the upload router calls this best-effort: if the
+    sections insert fails for some reason, the document row has already
+    committed and the document remains usable (the analyse handler emits
+    a warning when ``list_sections_for_document`` is empty). Better
+    partial state than refusing the upload.
+    """
+    rows: list[tuple[str, str, int, str, str, str, int, int, int]] = []
+    ids: list[str] = []
+    for section in sections:
+        section_id = str(uuid.uuid4())
+        ids.append(section_id)
+        rows.append(
+            (
+                section_id,
+                document_id,
+                int(section["idx"]),
+                str(section["number"]),
+                str(section["title"]),
+                str(section["body"]),
+                int(section["char_start"]),
+                int(section["char_end"]),
+                int(section["page"]),
+            )
+        )
+    if not rows:
+        return []
+    with _connect(path) as conn:
+        conn.executemany(
+            """
+            INSERT INTO sections
+                (id, document_id, idx, number, title, body, char_start, char_end, page)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+        conn.commit()
+    return ids
+
+
+def list_sections_for_document(
+    document_id: str,
+    path: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Return all sections for a document, sorted by ``idx`` ascending.
+
+    The returned dicts include ``id``, ``document_id``, ``idx``,
+    ``number``, ``title``, ``body``, ``char_start``, ``char_end``, ``page``.
+    """
+    with _connect(path) as conn:
+        rows = conn.execute(
+            """
+            SELECT id, document_id, idx, number, title, body, char_start,
+                   char_end, page
+            FROM sections
+            WHERE document_id = ?
+            ORDER BY idx ASC
             """,
             (document_id,),
         ).fetchall()

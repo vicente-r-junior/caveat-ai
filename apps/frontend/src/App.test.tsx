@@ -53,6 +53,7 @@ vi.mock('./api/analyze', () => ({
     },
     warnings: [],
     elapsed_seconds: 0,
+    source_sections: [],
   }),
 }));
 

@@ -173,3 +173,113 @@ def test_findings_cascade_on_document_delete(tmp_path: Path) -> None:
 
     assert db.delete_document(doc_id, path=path) is True
     assert db.list_findings_for_document(doc_id, path=path) == []
+
+
+# ---------------------------------------------------------------------------
+# Sections CRUD (Sprint 3 — T003 / T008)
+# ---------------------------------------------------------------------------
+
+
+def _section_payload(
+    *,
+    idx: int,
+    number: str,
+    title: str,
+    body: str = "body",
+    char_start: int = 0,
+    char_end: int = 100,
+    page: int = 1,
+) -> dict[str, object]:
+    return {
+        "idx": idx,
+        "number": number,
+        "title": title,
+        "body": body,
+        "char_start": char_start,
+        "char_end": char_end,
+        "page": page,
+    }
+
+
+def test_insert_sections_round_trip_returns_rows_in_idx_order(tmp_path: Path) -> None:
+    path = _db_path(tmp_path)
+    db.init_db(path)
+
+    doc_id = db.insert_document(
+        filename="x.pdf", page_count=2, text="contract text", path=path
+    )
+
+    # Insert in a deliberately scrambled order — list_sections must still
+    # return them sorted by ``idx`` ascending.
+    sections = [
+        _section_payload(
+            idx=2, number="3", title="Indemnity", char_start=200, char_end=300, page=2
+        ),
+        _section_payload(
+            idx=0, number="1", title="Definitions", char_start=0, char_end=100, page=1
+        ),
+        _section_payload(
+            idx=1, number="2", title="Liability", char_start=100, char_end=200, page=1
+        ),
+    ]
+
+    ids = db.insert_sections(doc_id, sections, path=path)
+    assert len(ids) == 3
+    assert all(isinstance(i, str) and len(i) > 0 for i in ids)
+
+    rows = db.list_sections_for_document(doc_id, path=path)
+    assert len(rows) == 3
+    # idx-sorted ascending.
+    assert [r["idx"] for r in rows] == [0, 1, 2]
+    assert [r["number"] for r in rows] == ["1", "2", "3"]
+    assert [r["title"] for r in rows] == ["Definitions", "Liability", "Indemnity"]
+    # All scalar fields round-tripped.
+    assert rows[0]["char_start"] == 0 and rows[0]["char_end"] == 100
+    assert rows[1]["page"] == 1
+    assert rows[2]["page"] == 2
+
+
+def test_insert_sections_empty_list_is_noop(tmp_path: Path) -> None:
+    path = _db_path(tmp_path)
+    db.init_db(path)
+
+    doc_id = db.insert_document(filename="x.pdf", page_count=1, text="t", path=path)
+    ids = db.insert_sections(doc_id, [], path=path)
+
+    assert ids == []
+    assert db.list_sections_for_document(doc_id, path=path) == []
+
+
+def test_sections_cascade_on_document_delete(tmp_path: Path) -> None:
+    """Deleting a document removes its sections via FK cascade."""
+    path = _db_path(tmp_path)
+    db.init_db(path)
+
+    doc_id = db.insert_document(filename="x.pdf", page_count=1, text="t", path=path)
+    db.insert_sections(
+        doc_id,
+        [
+            _section_payload(idx=0, number="1", title="One"),
+            _section_payload(idx=1, number="2", title="Two"),
+        ],
+        path=path,
+    )
+    assert len(db.list_sections_for_document(doc_id, path=path)) == 2
+
+    assert db.delete_document(doc_id, path=path) is True
+    assert db.list_sections_for_document(doc_id, path=path) == []
+
+
+def test_init_db_idempotent_includes_sections_table(tmp_path: Path) -> None:
+    """Calling init_db twice does not fail and the sections schema works."""
+    path = _db_path(tmp_path)
+    db.init_db(path)
+    db.init_db(path)
+
+    doc_id = db.insert_document(filename="x.pdf", page_count=1, text="t", path=path)
+    db.insert_sections(
+        doc_id,
+        [_section_payload(idx=0, number="1", title="One")],
+        path=path,
+    )
+    assert len(db.list_sections_for_document(doc_id, path=path)) == 1

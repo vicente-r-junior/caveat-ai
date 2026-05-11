@@ -15,7 +15,7 @@
  * shape of the eventual API stays optional.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AnalyzeResponse, Finding, Severity } from '../api/analyze';
 
 type FindingState = 'pending' | 'accepted' | 'dismissed';
@@ -58,10 +58,53 @@ function pluralizeCount(n: number): string {
 
 type FindingsProps = {
   analysis: AnalyzeResponse;
+  /**
+   * Sprint 3 cross-tab linking. When set, the matching finding card is
+   * scrolled into view and tagged with `data-finding-target="true"` for
+   * 1500ms. Both props default to undefined; absent both, behavior is
+   * byte-identical to Sprint 2.
+   */
+  targetFindingIndex?: number | null;
+  onTargetHandled?: () => void;
 };
 
-export function Findings({ analysis }: FindingsProps): JSX.Element {
+export function Findings({
+  analysis,
+  targetFindingIndex,
+  onTargetHandled,
+}: FindingsProps): JSX.Element {
   const findings = analysis.findings;
+  // Map keyed on the ORIGINAL findings index so cross-tab linking matches
+  // the source_offset.section_index → finding-index mapping. Filter-reduced
+  // index would not survive dismiss/filter operations.
+  const cardRefs = useRef<Map<number, HTMLElement | null>>(new Map());
+
+  // Cross-tab scroll: when the prop becomes a real index, look up the card
+  // by original index, scroll it into view, tag it briefly, and clear.
+  //
+  // Note on the lifecycle: we deliberately do NOT clear the timeout in a
+  // cleanup function, because `onTargetHandled?.()` synchronously sets the
+  // parent's `targetFindingIndex` back to null, which retriggers this
+  // effect with a null value. If that retrigger cleared the timer, the
+  // attribute would never auto-clear. Fire-and-forget is fine: the
+  // attribute lives on a DOM node ref'd by the live component, and the
+  // 1500ms removal is best-effort visual decay.
+  useEffect(() => {
+    if (targetFindingIndex == null) return;
+    const el = cardRefs.current.get(targetFindingIndex);
+    if (!el) {
+      // Card may be filtered out (e.g., dismissed). Still clear so we don't
+      // leak the target index if the user re-applies filters later.
+      onTargetHandled?.();
+      return;
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.setAttribute('data-finding-target', 'true');
+    setTimeout(() => {
+      el.removeAttribute('data-finding-target');
+    }, 1500);
+    onTargetHandled?.();
+  }, [targetFindingIndex, onTargetHandled]);
 
   // index → state. Default 'pending'. Map-backed so dismiss is just a delete.
   const [stateById, setStateById] = useState<Map<number, FindingState>>(
@@ -269,6 +312,13 @@ export function Findings({ analysis }: FindingsProps): JSX.Element {
                   setStateFor(idx, state === 'accepted' ? 'pending' : 'accepted')
                 }
                 onDismiss={() => setStateFor(idx, 'dismissed')}
+                cardRef={(el) => {
+                  if (el) {
+                    cardRefs.current.set(idx, el);
+                  } else {
+                    cardRefs.current.delete(idx);
+                  }
+                }}
               />
             );
           })}
@@ -330,6 +380,8 @@ type FindingCardProps = {
   state: FindingState;
   onAccept: () => void;
   onDismiss: () => void;
+  /** Optional ref binder for cross-tab scroll (Sprint 3). */
+  cardRef?: (el: HTMLElement | null) => void;
 };
 
 function FindingCard({
@@ -337,6 +389,7 @@ function FindingCard({
   state,
   onAccept,
   onDismiss,
+  cardRef,
 }: FindingCardProps): JSX.Element {
   const isAccepted = state === 'accepted';
   const cardClass = [
@@ -346,6 +399,7 @@ function FindingCard({
 
   return (
     <article
+      ref={cardRef}
       className={cardClass}
       data-testid="finding-card"
       data-state={state}
